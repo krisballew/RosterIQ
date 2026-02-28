@@ -3,7 +3,7 @@
  * Safe for use in Server Components, Route Handlers, and layouts.
  * Uses next/headers, so callers run in the Node.js runtime by default.
  */
-import { createServerClient } from "@supabase/ssr";
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
 function assertEnv(name: string, value: string | undefined): string {
@@ -34,7 +34,7 @@ export async function createClient() {
       getAll() {
         return cookieStore.getAll();
       },
-      setAll(cookiesToSet) {
+      setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
         try {
           cookiesToSet.forEach(({ name, value, options }) =>
             cookieStore.set(name, value, options)
