@@ -12,21 +12,22 @@ function assertEnv(name: string, value: string | undefined): string {
   return value;
 }
 
-const SUPABASE_URL = assertEnv(
-  "NEXT_PUBLIC_SUPABASE_URL",
-  process.env.NEXT_PUBLIC_SUPABASE_URL
-);
-const SUPABASE_ANON_KEY = assertEnv(
-  "NEXT_PUBLIC_SUPABASE_ANON_KEY",
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
-
 export async function createClient() {
+  // Evaluated at request time — env vars are available
+  const supabaseUrl = assertEnv(
+    "NEXT_PUBLIC_SUPABASE_URL",
+    process.env.NEXT_PUBLIC_SUPABASE_URL
+  );
+  const supabaseAnonKey = assertEnv(
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  );
+
   const cookieStore = await cookies();
 
   return createServerClient(
-    SUPABASE_URL,
-    SUPABASE_ANON_KEY,
+    supabaseUrl,
+    supabaseAnonKey,
     {
       cookies: {
         getAll() {
@@ -50,14 +51,19 @@ export async function createClient() {
 /**
  * Admin client using the service role key.
  * ONLY for Route Handlers and Server Components — never expose to the browser.
- * File must declare `export const runtime = 'nodejs'` to prevent Edge bundling.
+ * Files using this must declare `export const runtime = 'nodejs'`.
  */
 export function createAdminClient() {
+  // Evaluated at request time — env vars are available
+  const supabaseUrl = assertEnv(
+    "NEXT_PUBLIC_SUPABASE_URL",
+    process.env.NEXT_PUBLIC_SUPABASE_URL
+  );
   const serviceRoleKey = assertEnv(
     "SUPABASE_SERVICE_ROLE_KEY",
     process.env.SUPABASE_SERVICE_ROLE_KEY
   );
-  return createSupabaseClient(SUPABASE_URL, serviceRoleKey, {
+  return createSupabaseClient(supabaseUrl, serviceRoleKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 }
