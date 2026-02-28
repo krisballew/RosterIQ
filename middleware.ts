@@ -39,16 +39,21 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  // Refresh session — do not remove
+  // getSession() is Edge-safe (reads from cookie, no network call).
+  // getUser() makes a network round-trip to Supabase which can be slow/flaky
+  // in the Edge runtime and is not required for redirect gating.
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
+  const user = session?.user ?? null;
 
   const { pathname } = request.nextUrl;
 
-  // Public routes
-  const publicPaths = ["/login", "/auth/callback"];
-  const isPublic = publicPaths.some((p) => pathname.startsWith(p));
+  // Never redirect these paths — auth callback, login, API routes
+  const isPublic =
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/auth/callback") ||
+    pathname.startsWith("/api/");
 
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();
@@ -72,7 +77,15 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
+  // Run middleware on all routes EXCEPT:
+  //  - _next/static  (static assets)
+  //  - _next/image   (Next.js image optimisation)
+  //  - favicon.ico
+  //  - image/font/media file extensions
+  // Note: /api/* and /auth/callback are included in the matcher so cookies
+  // are still refreshed, but the redirect logic above skips them.
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2?)$).*)",
   ],
 };
+
