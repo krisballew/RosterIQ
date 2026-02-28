@@ -36,11 +36,11 @@ export async function middleware(request: NextRequest) {
     },
   });
 
-  // getSession() is Edge-safe: reads JWT from cookie, no network call.
+  // getUser() validates the JWT with Supabase Auth — required since getSession()
+  // was removed from SupabaseAuthClient types in supabase-js 2.65+.
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  const user = session?.user ?? null;
+    data: { user },
+  } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
 
