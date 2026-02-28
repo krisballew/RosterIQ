@@ -17,6 +17,19 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  const { pathname } = request.nextUrl;
+
+  // Short-circuit for public paths — skip the Supabase network call entirely.
+  // This prevents a getUser() network failure from 500-ing the login page.
+  const isPublic =
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/auth/callback") ||
+    pathname.startsWith("/api/");
+
+  if (isPublic) {
+    return NextResponse.next({ request });
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
@@ -36,27 +49,24 @@ export async function middleware(request: NextRequest) {
     },
   });
 
-  // getUser() validates the JWT with Supabase Auth — required since getSession()
-  // was removed from SupabaseAuthClient types in supabase-js 2.65+.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // getUser() makes a network call to validate the JWT.
+  // Wrap in try-catch so a transient Supabase outage never 500s the app.
+  let user = null;
+  try {
+    const { data } = await supabase.auth.getUser();
+    user = data.user;
+  } catch (err) {
+    console.error("[middleware] supabase.auth.getUser() threw:", err);
+    // Fall through — treat as unauthenticated and redirect to login.
+  }
 
-  const { pathname } = request.nextUrl;
-
-  // Public paths — never redirect.
-  const isPublic =
-    pathname.startsWith("/login") ||
-    pathname.startsWith("/auth/callback") ||
-    pathname.startsWith("/api/");
-
-  if (!user && !isPublic) {
+  if (!user) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
   }
 
-  if (user && (pathname === "/" || pathname === "/login")) {
+  if (pathname === "/") {
     const url = request.nextUrl.clone();
     url.pathname = "/app/home";
     return NextResponse.redirect(url);
