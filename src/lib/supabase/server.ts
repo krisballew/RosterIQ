@@ -1,12 +1,32 @@
 import { createServerClient } from "@supabase/ssr";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
+
+function assertEnv(name: string, value: string | undefined): string {
+  if (!value) {
+    throw new Error(
+      `[RosterIQ] Missing required environment variable: ${name}. ` +
+        `Check your .env.local (dev) or Vercel project environment variables (production).`
+    );
+  }
+  return value;
+}
+
+const SUPABASE_URL = assertEnv(
+  "NEXT_PUBLIC_SUPABASE_URL",
+  process.env.NEXT_PUBLIC_SUPABASE_URL
+);
+const SUPABASE_ANON_KEY = assertEnv(
+  "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+);
 
 export async function createClient() {
   const cookieStore = await cookies();
 
   return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    SUPABASE_URL,
+    SUPABASE_ANON_KEY,
     {
       cookies: {
         getAll() {
@@ -27,14 +47,17 @@ export async function createClient() {
   );
 }
 
-/** Admin client using service role key — only for server-side trusted operations */
-export async function createAdminClient() {
-  const { createClient: createSupabaseClient } = await import(
-    "@supabase/supabase-js"
+/**
+ * Admin client using the service role key.
+ * ONLY for Route Handlers and Server Components — never expose to the browser.
+ * File must declare `export const runtime = 'nodejs'` to prevent Edge bundling.
+ */
+export function createAdminClient() {
+  const serviceRoleKey = assertEnv(
+    "SUPABASE_SERVICE_ROLE_KEY",
+    process.env.SUPABASE_SERVICE_ROLE_KEY
   );
-  return createSupabaseClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  );
+  return createSupabaseClient(SUPABASE_URL, serviceRoleKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
 }

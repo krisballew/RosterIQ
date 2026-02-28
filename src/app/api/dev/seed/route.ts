@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/server";
 
+// Service role key requires Node.js runtime (not Edge)
+export const runtime = "nodejs";
+
 export async function POST(req: NextRequest) {
   // Block in production
   if (process.env.NODE_ENV === "production") {
@@ -13,7 +16,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid harness secret" }, { status: 401 });
   }
 
-  const admin = await createAdminClient();
+  const admin = createAdminClient();
   const results: Record<string, unknown> = {};
 
   // 1. Create "Coppell FC" tenant

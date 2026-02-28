@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { isPlatformAdmin } from "@/lib/roles";
+
+// Service role key + next/headers require Node.js runtime (not Edge)
+export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
   // Auth check
@@ -39,7 +41,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const admin = await createAdminClient();
+  const admin = createAdminClient();
 
   // Create user via Admin API
   const { data: newUser, error: createError } = await admin.auth.admin.createUser(
