@@ -49,7 +49,7 @@ export default function LoginPage() {
             <img
               src="/rosteriq-logo.png"
               alt="RosterIQ"
-              className="h-32 w-auto object-contain"
+              className="h-48 w-auto object-contain"
             />
           </div>
 
