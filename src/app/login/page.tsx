@@ -3,16 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -43,70 +33,116 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
-      <div className="w-full max-w-md">
-        {/* Logo / Brand */}
-        <div className="mb-8 flex flex-col items-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-600 shadow-sm">
-            <span className="text-xl font-bold text-white">R</span>
+    <div
+      className="flex min-h-screen items-center justify-center p-4"
+      style={{
+        background: "linear-gradient(135deg, #0d6e7a 0%, #0a4a5c 50%, #083a4a 100%)",
+      }}
+    >
+      {/* Card */}
+      <div className="flex w-full max-w-sm flex-col rounded-2xl bg-white shadow-2xl overflow-hidden">
+        {/* Card body - grows to fill space */}
+        <div className="flex flex-col flex-1 px-10 pt-10 pb-6">
+          {/* Logo */}
+          <div className="flex flex-col items-center mb-8">
+            <svg
+              width="56"
+              height="56"
+              viewBox="0 0 56 56"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              className="mb-4"
+            >
+              {/* Outer hexagon */}
+              <path
+                d="M28 4L50 16.5V39.5L28 52L6 39.5V16.5L28 4Z"
+                stroke="#0d6e7a"
+                strokeWidth="2.5"
+                fill="none"
+              />
+              {/* Middle hexagon */}
+              <path
+                d="M28 11L44 20.5V35.5L28 45L12 35.5V20.5L28 11Z"
+                stroke="#0d9db0"
+                strokeWidth="2"
+                fill="none"
+              />
+              {/* Inner hexagon */}
+              <path
+                d="M28 18L38 24V36L28 42L18 36V24L28 18Z"
+                stroke="#0d6e7a"
+                strokeWidth="1.5"
+                fill="none"
+              />
+            </svg>
+            <span className="text-2xl font-bold tracking-tight text-gray-900">RosterIQ</span>
           </div>
-          <h1 className="mt-4 text-2xl font-bold text-gray-900">RosterIQ</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Club management made intelligent
+
+          {/* Heading */}
+          <h2 className="text-xl font-semibold text-gray-900 mb-1">Sign in</h2>
+          <p className="text-sm text-gray-500 mb-6">
+            Enter your Login ID and password to access your account.
           </p>
+
+          {/* Form */}
+          <form onSubmit={handleLogin} className="flex flex-col gap-4">
+            {/* Login ID field */}
+            <div>
+              <input
+                id="email"
+                type="email"
+                placeholder="Login ID"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                autoComplete="email"
+                className="w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-[#0d6e7a] focus:ring-2 focus:ring-[#0d6e7a]/20 transition"
+              />
+              {error && (
+                <p className="mt-1 text-xs text-red-500">{error}</p>
+              )}
+            </div>
+
+            {/* Password field */}
+            <div>
+              <input
+                id="password"
+                type="password"
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                autoComplete="current-password"
+                className="w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-[#0d6e7a] focus:ring-2 focus:ring-[#0d6e7a]/20 transition"
+              />
+            </div>
+
+            {/* Forgot password */}
+            <a
+              href="#"
+              className="text-sm text-[#0d6e7a] hover:underline self-start -mt-1"
+            >
+              Forgot Password?
+            </a>
+
+            {/* Spacer to push button toward bottom */}
+            <div className="mt-4" />
+
+            {/* Sign in button */}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full rounded-md bg-[#0d6e7a] py-2.5 text-sm font-semibold text-white hover:bg-[#0a5a65] disabled:opacity-50 transition"
+            >
+              {loading ? "Signing in…" : "Sign In"}
+            </button>
+          </form>
         </div>
 
-        <Card className="shadow-md">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-xl">Sign in to your account</CardTitle>
-            <CardDescription>
-              Enter your credentials to access the platform.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleLogin} className="space-y-4">
-              {error && (
-                <div className="rounded-md bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
-                  {error}
-                </div>
-              )}
-
-              <div className="space-y-1.5">
-                <Label htmlFor="email">Email address</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="you@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  autoComplete="email"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  autoComplete="current-password"
-                />
-              </div>
-
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Signing in…" : "Sign in"}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-
-        <p className="mt-6 text-center text-xs text-gray-400">
+        {/* Footer strip */}
+        <div className="border-t border-gray-100 px-10 py-3 text-center text-xs text-gray-400">
           © {new Date().getFullYear()} RosterIQ · All rights reserved
-        </p>
+        </div>
       </div>
     </div>
   );
