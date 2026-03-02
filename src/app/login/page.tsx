@@ -40,7 +40,7 @@ export default function LoginPage() {
       }}
     >
       {/* Card */}
-      <div className="flex w-full max-w-md flex-col rounded-2xl bg-white shadow-2xl overflow-hidden">
+      <div className="flex w-full max-w-xl flex-col rounded-2xl bg-white shadow-2xl overflow-hidden">
         {/* Card body - grows to fill space */}
         <div className="flex flex-col flex-1 px-10 pt-10 pb-6">
           {/* Logo */}
@@ -49,7 +49,8 @@ export default function LoginPage() {
             <img
               src="/rosteriq-logo.png"
               alt="RosterIQ"
-              className="h-48 w-auto object-contain"
+              className="object-contain"
+              style={{ height: "300px", width: "450px" }}
             />
           </div>
 
