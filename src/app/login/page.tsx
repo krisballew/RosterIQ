@@ -45,37 +45,12 @@ export default function LoginPage() {
         <div className="flex flex-col flex-1 px-10 pt-10 pb-6">
           {/* Logo */}
           <div className="flex flex-col items-center mb-8">
-            <svg
-              width="56"
-              height="56"
-              viewBox="0 0 56 56"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-              className="mb-4"
-            >
-              {/* Outer hexagon */}
-              <path
-                d="M28 4L50 16.5V39.5L28 52L6 39.5V16.5L28 4Z"
-                stroke="#0d6e7a"
-                strokeWidth="2.5"
-                fill="none"
-              />
-              {/* Middle hexagon */}
-              <path
-                d="M28 11L44 20.5V35.5L28 45L12 35.5V20.5L28 11Z"
-                stroke="#0d9db0"
-                strokeWidth="2"
-                fill="none"
-              />
-              {/* Inner hexagon */}
-              <path
-                d="M28 18L38 24V36L28 42L18 36V24L28 18Z"
-                stroke="#0d6e7a"
-                strokeWidth="1.5"
-                fill="none"
-              />
-            </svg>
-            <span className="text-2xl font-bold tracking-tight text-gray-900">RosterIQ</span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/rosteriq-logo.png"
+              alt="RosterIQ"
+              className="h-20 w-auto object-contain"
+            />
           </div>
 
           {/* Heading */}
