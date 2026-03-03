@@ -71,7 +71,6 @@ const ROLE_COLORS: Record<string, string> = {
 
 export function ClubAdminsClient({ initialAdmins, tenants }: ClubAdminsClientProps) {
   const router = useRouter();
-  const [admins, setAdmins] = useState<ClubAdminRow[]>(initialAdmins);
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -292,8 +291,8 @@ export function ClubAdminsClient({ initialAdmins, tenants }: ClubAdminsClientPro
 
       {/* Split into invited (pending) and active */}
       {(() => {
-        const pending = admins.filter((a) => !a.profiles?.last_login_at);
-        const active = admins.filter((a) => !!a.profiles?.last_login_at);
+        const pending = initialAdmins.filter((a) => !a.profiles?.last_login_at);
+        const active = initialAdmins.filter((a) => !!a.profiles?.last_login_at);
 
         const AdminTable = ({ rows, showResend }: { rows: ClubAdminRow[]; showResend: boolean }) => (
           <div className="overflow-x-auto">
@@ -381,7 +380,7 @@ export function ClubAdminsClient({ initialAdmins, tenants }: ClubAdminsClientPro
           </div>
         );
 
-        if (admins.length === 0) {
+        if (initialAdmins.length === 0) {
           return (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-16 gap-3">
