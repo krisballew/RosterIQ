@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const { email } = await req.json().catch(() => ({})) as { email?: string };
+  const { email, userId: oldUserId } = await req.json().catch(() => ({})) as { email?: string; userId?: string };
   if (!email?.trim()) {
     return NextResponse.json({ error: "Email is required" }, { status: 400 });
   }
@@ -25,20 +25,34 @@ export async function POST(req: NextRequest) {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
   const redirectTo = `${baseUrl}/auth/callback?type=invite`;
 
-  // Try invite first (works if user hasn't confirmed yet)
-  const { error: inviteError } = await admin.auth.admin.inviteUserByEmail(
+  // Try a fresh invite (succeeds when the user was deleted from Supabase)
+  const { data: inviteData, error: inviteError } = await admin.auth.admin.inviteUserByEmail(
     email.trim().toLowerCase(),
     { redirectTo }
   );
 
   if (inviteError) {
-    // User already confirmed — send a password reset email via Supabase SMTP
+    // User still exists in Supabase — send a password reset / set-password email
     const { error: resetError } = await admin.auth.resetPasswordForEmail(
       email.trim().toLowerCase(),
       { redirectTo }
     );
     if (resetError) {
       return NextResponse.json({ error: resetError.message }, { status: 422 });
+    }
+  } else {
+    // Fresh invite succeeded — a new user was created (old one must have been deleted).
+    // Update any memberships that still point to the old user_id.
+    const newUserId = inviteData?.user?.id;
+    if (newUserId && oldUserId && newUserId !== oldUserId) {
+      await admin
+        .from("memberships")
+        .update({ user_id: newUserId })
+        .eq("user_id", oldUserId);
+      await admin
+        .from("profiles")
+        .update({ user_id: newUserId })
+        .eq("user_id", oldUserId);
     }
   }
 

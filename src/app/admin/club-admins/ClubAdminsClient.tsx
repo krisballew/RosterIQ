@@ -84,7 +84,7 @@ export function ClubAdminsClient({ initialAdmins, tenants }: ClubAdminsClientPro
     const res = await fetch("/api/admin/club-admins/resend-invite", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: adminRow.email }),
+      body: JSON.stringify({ email: adminRow.email, userId: adminRow.user_id }),
     });
     setResendingId(null);
     if (res.ok) {
