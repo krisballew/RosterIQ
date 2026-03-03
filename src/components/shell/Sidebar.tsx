@@ -91,7 +91,10 @@ export function Sidebar({ isPlatformAdmin, isClubAdmin = false, pendingRequestsC
         </ul>
 
         {(isClubAdmin || isPlatformAdmin) && (
-          <div className="mt-4">
+          <div className="mt-6">
+            <p className="mb-1 px-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
+              Club Admin
+            </p>
             <ul className="space-y-1">
               <li>
                 <Link
@@ -124,7 +127,10 @@ export function Sidebar({ isPlatformAdmin, isClubAdmin = false, pendingRequestsC
         )}
 
         {isPlatformAdmin && (
-          <div className="mt-4">
+          <div className="mt-6">
+            <p className="mb-1 px-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
+              Administration
+            </p>
             <ul className="space-y-1">
               <li>
                 <Link
