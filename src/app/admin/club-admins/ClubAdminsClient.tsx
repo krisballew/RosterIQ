@@ -17,6 +17,7 @@ import {
   UserX,
   Trash2,
   XCircle,
+  KeyRound,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,6 +44,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import type { Tenant } from "@/types/database";
 
 const ADMIN_ROLES = [
@@ -92,6 +101,49 @@ export function ClubAdminsClient({ initialAdmins, tenants }: ClubAdminsClientPro
   const [confirmAction, setConfirmAction] = useState<{ row: ClubAdminRow; type: "deactivate" | "delete" } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  // Set password
+  const [setPasswordTarget, setSetPasswordTarget] = useState<ClubAdminRow | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [setPasswordLoading, setSetPasswordLoading] = useState(false);
+  const [setPasswordError, setSetPasswordError] = useState<string | null>(null);
+  const [setPasswordDone, setSetPasswordDone] = useState(false);
+
+  function openSetPassword(row: ClubAdminRow) {
+    setSetPasswordTarget(row);
+    setNewPassword("");
+    setConfirmPassword("");
+    setSetPasswordError(null);
+    setSetPasswordDone(false);
+  }
+
+  async function handleSetPassword() {
+    if (!setPasswordTarget) return;
+    if (newPassword.length < 8) {
+      setSetPasswordError("Password must be at least 8 characters.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setSetPasswordError("Passwords do not match.");
+      return;
+    }
+    setSetPasswordLoading(true);
+    setSetPasswordError(null);
+    const res = await fetch(`/api/admin/club-admins/${setPasswordTarget.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: newPassword }),
+    });
+    setSetPasswordLoading(false);
+    if (res.ok) {
+      setSetPasswordDone(true);
+      setTimeout(() => setSetPasswordTarget(null), 2000);
+    } else {
+      const body = await res.json().catch(() => ({}));
+      setSetPasswordError(body.error ?? "Failed to set password.");
+    }
+  }
 
   async function handleConfirmAction() {
     if (!confirmAction) return;
@@ -437,6 +489,14 @@ export function ClubAdminsClient({ initialAdmins, tenants }: ClubAdminsClientPro
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem
+                              className="gap-2 text-gray-700 focus:text-gray-900"
+                              onClick={() => openSetPassword(a)}
+                            >
+                              <KeyRound className="h-3.5 w-3.5" />
+                              Set Password
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
                               className="gap-2 text-amber-600 focus:text-amber-600 focus:bg-amber-50"
                               onClick={() => setConfirmAction({ row: a, type: "deactivate" })}
                             >
@@ -510,6 +570,82 @@ export function ClubAdminsClient({ initialAdmins, tenants }: ClubAdminsClientPro
           </div>
         );
       })()}
+
+      {/* Set Password dialog */}
+      <Dialog
+        open={!!setPasswordTarget}
+        onOpenChange={(open) => { if (!open) setSetPasswordTarget(null); }}
+      >
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Set Password</DialogTitle>
+            <DialogDescription>
+              Manually set a new password for{" "}
+              <span className="font-medium text-gray-900">
+                {setPasswordTarget?.email}
+              </span>.
+              They will be able to sign in with this password immediately.
+            </DialogDescription>
+          </DialogHeader>
+
+          {setPasswordDone ? (
+            <div className="flex flex-col items-center gap-2 py-4 text-center">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100">
+                <CheckCircle className="h-5 w-5 text-emerald-600" />
+              </div>
+              <p className="text-sm font-medium text-gray-900">Password updated!</p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3 py-1">
+              <div className="space-y-1.5">
+                <Label htmlFor="sp-password">New Password</Label>
+                <Input
+                  id="sp-password"
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="At least 8 characters"
+                  autoComplete="new-password"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="sp-confirm">Confirm Password</Label>
+                <Input
+                  id="sp-confirm"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Repeat password"
+                  autoComplete="new-password"
+                />
+              </div>
+              {setPasswordError && (
+                <p className="text-xs text-red-500">{setPasswordError}</p>
+              )}
+            </div>
+          )}
+
+          {!setPasswordDone && (
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setSetPasswordTarget(null)}
+                disabled={setPasswordLoading}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSetPassword}
+                disabled={setPasswordLoading || !newPassword || !confirmPassword}
+                className="bg-[#0d6e7a] hover:bg-[#0a5a65] text-white"
+              >
+                {setPasswordLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Set Password
+              </Button>
+            </DialogFooter>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Confirmation modal for deactivate / delete */}
       {confirmAction && (
