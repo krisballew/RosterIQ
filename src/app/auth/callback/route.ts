@@ -24,7 +24,7 @@ export async function GET(request: Request) {
       type: type as "recovery" | "invite" | "email" | "signup" | "magiclink",
     });
     if (!error) {
-      const destination = type === "recovery" ? "/auth/reset-password" : next;
+      const destination = (type === "recovery" || type === "invite") ? "/auth/reset-password" : next;
       return NextResponse.redirect(`${baseUrl}${destination}`);
     }
   }
@@ -33,7 +33,7 @@ export async function GET(request: Request) {
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
-      const destination = type === "recovery" ? "/auth/reset-password" : next;
+      const destination = (type === "recovery" || type === "invite") ? "/auth/reset-password" : next;
       return NextResponse.redirect(`${baseUrl}${destination}`);
     }
   }
