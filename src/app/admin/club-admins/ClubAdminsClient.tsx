@@ -77,6 +77,7 @@ export function ClubAdminsClient({ initialAdmins, tenants }: ClubAdminsClientPro
   const [successEmail, setSuccessEmail] = useState<string | null>(null);
   const [resendingId, setResendingId] = useState<string | null>(null);
   const [resentId, setResentId] = useState<string | null>(null);
+  const [resendError, setResendError] = useState<string | null>(null);
 
   async function handleResendInvite(adminRow: ClubAdminRow) {
     setResendingId(adminRow.id);
@@ -88,7 +89,12 @@ export function ClubAdminsClient({ initialAdmins, tenants }: ClubAdminsClientPro
     setResendingId(null);
     if (res.ok) {
       setResentId(adminRow.id);
+      setResendError(null);
       setTimeout(() => setResentId(null), 3000);
+    } else {
+      const body = await res.json().catch(() => ({}));
+      setResendError(body.error ?? "Failed to resend invite");
+      setTimeout(() => setResendError(null), 5000);
     }
   }
 
@@ -393,6 +399,12 @@ export function ClubAdminsClient({ initialAdmins, tenants }: ClubAdminsClientPro
 
         return (
           <div className="space-y-6">
+            {/* Resend error toast */}
+            {resendError && (
+              <div className="rounded-md bg-red-50 border border-red-200 px-4 py-2 text-sm text-red-700">
+                {resendError}
+              </div>
+            )}
             {/* Pending / Invited */}
             {pending.length > 0 && (
               <div>

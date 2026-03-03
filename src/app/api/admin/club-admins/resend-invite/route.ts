@@ -23,13 +23,25 @@ export async function POST(req: NextRequest) {
 
   const admin = createAdminClient();
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  const redirectTo = `${baseUrl}/auth/callback?type=invite`;
 
-  const { error } = await admin.auth.admin.inviteUserByEmail(email.trim().toLowerCase(), {
-    redirectTo: `${baseUrl}/auth/callback?type=invite`,
-  });
+  // Try invite first (works if user hasn't confirmed yet)
+  const { error: inviteError } = await admin.auth.admin.inviteUserByEmail(
+    email.trim().toLowerCase(),
+    { redirectTo }
+  );
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 422 });
+  if (inviteError) {
+    // User already exists — generate a recovery link so they can set their password
+    const { error: linkError } = await admin.auth.admin.generateLink({
+      type: "recovery",
+      email: email.trim().toLowerCase(),
+      options: { redirectTo },
+    });
+
+    if (linkError) {
+      return NextResponse.json({ error: linkError.message }, { status: 422 });
+    }
   }
 
   return NextResponse.json({ success: true });
