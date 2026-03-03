@@ -10,6 +10,23 @@ export type Role =
 
 export type TenantStatus = "active" | "inactive" | "suspended";
 
+export type PlayerStatus = "active" | "inactive" | "practice_only";
+
+export interface Player {
+  id: string;
+  tenant_id: string;
+  first_name: string;
+  last_name: string;
+  team_assigned: string | null;
+  age_division: string | null;
+  date_of_birth: string | null;
+  primary_parent_email: string | null;
+  secondary_parent_email: string | null;
+  status: PlayerStatus;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Tenant {
   id: string;
   name: string;
@@ -123,6 +140,16 @@ export type Database = {
           created_at?: string;
         };
         Update: Partial<Omit<AccessRequest, "id">>;
+        Relationships: [];
+      };
+      players: {
+        Row: Player;
+        Insert: Omit<Player, "id" | "created_at" | "updated_at"> & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<Player, "id" | "tenant_id">>;
         Relationships: [];
       };
     };

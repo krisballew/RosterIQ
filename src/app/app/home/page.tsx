@@ -9,64 +9,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Users, ClipboardList, Megaphone, Search, BookOpen } from "lucide-react";
 
-const dashboardCards = [
-  {
-    title: "Current Roster",
-    description: "View and manage your active club roster.",
-    icon: Users,
-    badge: "Active",
-    badgeVariant: "success" as const,
-    stat: "—",
-    statLabel: "registered players",
-    href: "/app/roster",
-    color: "blue",
-  },
-  {
-    title: "Player Review Status",
-    description: "Track outstanding and completed player reviews.",
-    icon: ClipboardList,
-    badge: "Pending",
-    badgeVariant: "secondary" as const,
-    stat: "—",
-    statLabel: "reviews due",
-    href: "/app/reviews",
-    color: "amber",
-  },
-  {
-    title: "Club Announcements",
-    description: "Latest club information and announcements.",
-    icon: Megaphone,
-    badge: "Information",
-    badgeVariant: "outline" as const,
-    stat: "—",
-    statLabel: "new posts",
-    href: "/app/home",
-    color: "green",
-  },
-  {
-    title: "Recruitment",
-    description: "Prospects, tryouts, and open roster spots.",
-    icon: Search,
-    badge: "Open",
-    badgeVariant: "default" as const,
-    stat: "—",
-    statLabel: "active prospects",
-    href: "/app/recruitment",
-    color: "purple",
-  },
-  {
-    title: "My Training",
-    description: "Scheduled sessions and education resources.",
-    icon: BookOpen,
-    badge: "Scheduled",
-    badgeVariant: "secondary" as const,
-    stat: "—",
-    statLabel: "upcoming sessions",
-    href: "/app/education",
-    color: "sky",
-  },
-];
-
 const iconBgMap: Record<string, string> = {
   blue: "bg-blue-50 text-blue-600",
   amber: "bg-amber-50 text-amber-600",
@@ -81,11 +23,86 @@ export default async function HomePage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("first_name")
-    .eq("user_id", user!.id)
-    .single();
+  // Fetch profile and tenant membership in parallel
+  const [{ data: profile }, { data: membership }] = await Promise.all([
+    supabase.from("profiles").select("first_name").eq("user_id", user!.id).single(),
+    supabase
+      .from("memberships")
+      .select("tenant_id")
+      .eq("user_id", user!.id)
+      .not("tenant_id", "is", null)
+      .limit(1)
+      .single(),
+  ]);
+
+  // Fetch active player count for this tenant
+  let activePlayerCount: number = 0;
+  if (membership?.tenant_id) {
+    const { count } = await supabase
+      .from("players")
+      .select("id", { count: "exact", head: true })
+      .eq("tenant_id", membership.tenant_id)
+      .eq("status", "active");
+    activePlayerCount = count ?? 0;
+  }
+
+  const dashboardCards = [
+    {
+      title: "Current Roster",
+      description: "View and manage your active club roster.",
+      icon: Users,
+      badge: "Active",
+      badgeVariant: "success" as const,
+      stat: String(activePlayerCount),
+      statLabel: "registered players",
+      href: "/app/roster",
+      color: "blue",
+    },
+    {
+      title: "Player Review Status",
+      description: "Track outstanding and completed player reviews.",
+      icon: ClipboardList,
+      badge: "Pending",
+      badgeVariant: "secondary" as const,
+      stat: "—",
+      statLabel: "reviews due",
+      href: "/app/reviews",
+      color: "amber",
+    },
+    {
+      title: "Club Announcements",
+      description: "Latest club information and announcements.",
+      icon: Megaphone,
+      badge: "Information",
+      badgeVariant: "outline" as const,
+      stat: "—",
+      statLabel: "new posts",
+      href: "/app/home",
+      color: "green",
+    },
+    {
+      title: "Recruitment",
+      description: "Prospects, tryouts, and open roster spots.",
+      icon: Search,
+      badge: "Open",
+      badgeVariant: "default" as const,
+      stat: "—",
+      statLabel: "active prospects",
+      href: "/app/recruitment",
+      color: "purple",
+    },
+    {
+      title: "My Training",
+      description: "Scheduled sessions and education resources.",
+      icon: BookOpen,
+      badge: "Scheduled",
+      badgeVariant: "secondary" as const,
+      stat: "—",
+      statLabel: "upcoming sessions",
+      href: "/app/education",
+      color: "sky",
+    },
+  ];
 
   const greeting = profile?.first_name
     ? `Welcome back, ${profile.first_name}`

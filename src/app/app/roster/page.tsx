@@ -1,20 +1,37 @@
-import { Users } from "lucide-react";
+import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
+import { RosterClient } from "./RosterClient";
+import type { Player } from "@/types/database";
 
-export default function RosterPage() {
-  return (
-    <div className="max-w-6xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Roster Management</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          View, organize, and manage your club&apos;s player roster.
-        </p>
-      </div>
-      <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 bg-white py-20">
-        <Users className="h-10 w-10 text-gray-300" />
-        <p className="mt-4 text-sm font-medium text-gray-500">
-          Roster management coming soon
-        </p>
-      </div>
-    </div>
-  );
+export const runtime = "nodejs";
+
+export default async function RosterPage() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) redirect("/login");
+
+  // Get the user's tenant
+  const { data: membership } = await supabase
+    .from("memberships")
+    .select("tenant_id")
+    .eq("user_id", user.id)
+    .not("tenant_id", "is", null)
+    .limit(1)
+    .single();
+
+  let players: Player[] = [];
+  if (membership?.tenant_id) {
+    const { data } = await supabase
+      .from("players")
+      .select("*")
+      .eq("tenant_id", membership.tenant_id)
+      .order("last_name", { ascending: true })
+      .order("first_name", { ascending: true });
+    players = (data as Player[]) ?? [];
+  }
+
+  return <RosterClient initialPlayers={players} />;
 }
