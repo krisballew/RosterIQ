@@ -47,7 +47,6 @@ export interface ClubAdminRow {
   role: string;
   created_at: string;
   email: string;
-  registered_at: string | null;
   profiles: { first_name: string | null; last_name: string | null; last_login_at: string | null } | null;
   tenants: { name: string } | null;
 }
@@ -346,12 +345,12 @@ export function ClubAdminsClient({ initialAdmins, tenants }: ClubAdminsClientPro
                         </Badge>
                       </td>
                       <td className="px-4 py-3">
-                        {a.registered_at ? (
+                        {a.profiles?.last_login_at ? (
                           <div className="flex flex-col gap-0.5">
                             <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700">
                               <CheckCircle className="h-3.5 w-3.5" /> Registered
                             </span>
-                            <span className="text-xs text-gray-400">{new Date(a.registered_at).toLocaleDateString()}</span>
+                            <span className="text-xs text-gray-400">{new Date(a.profiles.last_login_at).toLocaleDateString()}</span>
                           </div>
                         ) : (
                           <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-600">

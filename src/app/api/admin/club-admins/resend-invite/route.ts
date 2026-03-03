@@ -32,15 +32,13 @@ export async function POST(req: NextRequest) {
   );
 
   if (inviteError) {
-    // User already exists — generate a recovery link so they can set their password
-    const { error: linkError } = await admin.auth.admin.generateLink({
-      type: "recovery",
-      email: email.trim().toLowerCase(),
-      options: { redirectTo },
-    });
-
-    if (linkError) {
-      return NextResponse.json({ error: linkError.message }, { status: 422 });
+    // User already confirmed — send a password reset email via Supabase SMTP
+    const { error: resetError } = await admin.auth.resetPasswordForEmail(
+      email.trim().toLowerCase(),
+      { redirectTo }
+    );
+    if (resetError) {
+      return NextResponse.json({ error: resetError.message }, { status: 422 });
     }
   }
 

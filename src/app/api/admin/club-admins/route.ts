@@ -84,8 +84,17 @@ export async function POST(req: NextRequest) {
     });
 
   if (inviteError) {
-    // If user already exists, just create the membership
-    if (!inviteError.message.toLowerCase().includes("already registered")) {
+    // If user already exists, fall back to sending a password reset (recovery) email
+    if (inviteError.message.toLowerCase().includes("already registered")) {
+      const { error: resetError } = await admin.auth.admin.generateLink({
+        type: "recovery",
+        email: email.trim().toLowerCase(),
+        options: { redirectTo },
+      });
+      // generateLink doesn't send email itself — use resetPasswordForEmail which uses Supabase SMTP
+      await admin.auth.resetPasswordForEmail(email.trim().toLowerCase(), { redirectTo });
+      void resetError; // best-effort; continue to create membership regardless
+    } else {
       return NextResponse.json({ error: inviteError.message }, { status: 422 });
     }
   }
