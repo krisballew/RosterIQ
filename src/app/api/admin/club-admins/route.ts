@@ -22,7 +22,7 @@ export async function GET() {
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("memberships")
-    .select("*, profiles(first_name, last_name, last_login_at), tenants(name)")
+    .select("*, tenants(name)")
     .in("role", ["club_admin", "club_director", "director_of_coaching"])
     .order("created_at", { ascending: false });
 
