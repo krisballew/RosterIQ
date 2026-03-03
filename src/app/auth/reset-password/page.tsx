@@ -16,17 +16,32 @@ export default function ResetPasswordPage() {
 
   useEffect(() => {
     const supabase = createClient();
-    // Supabase SSR browser client auto-processes hash tokens on load.
-    // We wait for the PASSWORD_RECOVERY or SIGNED_IN event before allowing submit.
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") {
         setSessionReady(true);
       }
     });
-    // Also check if a session already exists (e.g. came via token_hash callback)
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) setSessionReady(true);
-    });
+
+    // @supabase/ssr browser client does not auto-process hash fragments.
+    // Parse them manually and call setSession so the auth state fires.
+    const hash = window.location.hash.substring(1);
+    const params = new URLSearchParams(hash);
+    const accessToken = params.get("access_token");
+    const refreshToken = params.get("refresh_token");
+
+    if (accessToken && refreshToken) {
+      supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
+        .then(({ data }) => {
+          if (data.session) setSessionReady(true);
+        });
+    } else {
+      // Came via server callback (token_hash flow) — session already set
+      supabase.auth.getSession().then(({ data }) => {
+        if (data.session) setSessionReady(true);
+      });
+    }
+
     return () => subscription.unsubscribe();
   }, []);
 
