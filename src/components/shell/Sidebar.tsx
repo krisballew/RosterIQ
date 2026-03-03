@@ -35,7 +35,7 @@ export function Sidebar({ isPlatformAdmin, isClubAdmin = false, pendingRequestsC
   const pathname = usePathname();
 
   return (
-    <aside className="flex h-full w-64 flex-col border-r border-gray-200 bg-white">
+    <aside className="flex h-full w-64 flex-col bg-white">
       {/* Logo */}
       <div className="flex h-16 items-center px-6">
         <div className="flex items-center gap-2 min-w-0">
