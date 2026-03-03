@@ -70,9 +70,13 @@ export default async function AppLayout({
   const { data: tenants } = await supabase.from("tenants").select("*").order("name");
   const tenantList = tenants ?? [];
 
+  // Current tenant = first tenant the user has a membership in
+  const firstTenantId = membershipList.find((m) => m.tenant_id !== null)?.tenant_id;
+  const currentTenant = tenantList.find((t) => t.id === firstTenantId) ?? tenantList[0] ?? null;
+
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50">
-      <Sidebar isPlatformAdmin={isAdmin} isClubAdmin={isClubAdmin} pendingRequestsCount={pendingRequestsCount} />
+      <Sidebar isPlatformAdmin={isAdmin} isClubAdmin={isClubAdmin} pendingRequestsCount={pendingRequestsCount} currentTenant={currentTenant} />
       <div className="flex flex-1 flex-col overflow-hidden">
         <Header
           profile={profile}

@@ -13,6 +13,7 @@ import {
   UserCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { Tenant } from "@/types/database";
 
 const navItems = [
   { href: "/app/home", label: "Home", icon: LayoutDashboard },
@@ -27,20 +28,34 @@ interface SidebarProps {
   isPlatformAdmin: boolean;
   isClubAdmin?: boolean;
   pendingRequestsCount?: number;
+  currentTenant?: Tenant | null;
 }
 
-export function Sidebar({ isPlatformAdmin, isClubAdmin = false, pendingRequestsCount = 0 }: SidebarProps) {
+export function Sidebar({ isPlatformAdmin, isClubAdmin = false, pendingRequestsCount = 0, currentTenant }: SidebarProps) {
   const pathname = usePathname();
 
   return (
     <aside className="flex h-full w-64 flex-col border-r border-gray-200 bg-white">
       {/* Logo */}
       <div className="flex h-16 items-center border-b border-gray-200 px-6">
-        <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600">
-            <span className="text-sm font-bold text-white">R</span>
-          </div>
-          <span className="text-lg font-bold text-gray-900">RosterIQ</span>
+        <div className="flex items-center gap-2 min-w-0">
+          {currentTenant?.logo_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={currentTenant.logo_url}
+              alt={currentTenant.name}
+              className="h-8 w-8 rounded-lg object-contain flex-shrink-0"
+            />
+          ) : (
+            <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-blue-600">
+              <span className="text-sm font-bold text-white">
+                {currentTenant ? currentTenant.name[0].toUpperCase() : "R"}
+              </span>
+            </div>
+          )}
+          <span className="text-base font-bold text-gray-900 truncate">
+            {currentTenant ? currentTenant.name : "RosterIQ"}
+          </span>
         </div>
       </div>
 
