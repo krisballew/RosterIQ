@@ -42,13 +42,37 @@ export default async function AppLayout({
   const highestRole = getHighestRole(membershipList);
   const highestRoleLabel = highestRole ? getRoleLabel(highestRole) : "Member";
 
+  const isClubAdmin = isAdmin || membershipList.some((m) =>
+    ["club_admin", "club_director", "director_of_coaching"].includes(m.role)
+  );
+
+  // Fetch pending access requests count for the user's tenants
+  let pendingRequestsCount = 0;
+  if (isClubAdmin) {
+    const tenantIds = isAdmin
+      ? undefined
+      : membershipList.filter((m) => m.tenant_id !== null).map((m) => m.tenant_id as string);
+
+    let countQuery = supabase
+      .from("access_requests")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pending");
+
+    if (tenantIds && tenantIds.length > 0) {
+      countQuery = countQuery.in("tenant_id", tenantIds);
+    }
+
+    const { count } = await countQuery;
+    pendingRequestsCount = count ?? 0;
+  }
+
   // Fetch visible tenants
   const { data: tenants } = await supabase.from("tenants").select("*").order("name");
   const tenantList = tenants ?? [];
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50">
-      <Sidebar isPlatformAdmin={isAdmin} />
+      <Sidebar isPlatformAdmin={isAdmin} isClubAdmin={isClubAdmin} pendingRequestsCount={pendingRequestsCount} />
       <div className="flex flex-1 flex-col overflow-hidden">
         <Header
           profile={profile}

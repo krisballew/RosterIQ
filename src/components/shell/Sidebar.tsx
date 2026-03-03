@@ -10,6 +10,7 @@ import {
   Search,
   MapPin,
   Shield,
+  UserCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -24,9 +25,11 @@ const navItems = [
 
 interface SidebarProps {
   isPlatformAdmin: boolean;
+  isClubAdmin?: boolean;
+  pendingRequestsCount?: number;
 }
 
-export function Sidebar({ isPlatformAdmin }: SidebarProps) {
+export function Sidebar({ isPlatformAdmin, isClubAdmin = false, pendingRequestsCount = 0 }: SidebarProps) {
   const pathname = usePathname();
 
   return (
@@ -71,6 +74,42 @@ export function Sidebar({ isPlatformAdmin }: SidebarProps) {
             );
           })}
         </ul>
+
+        {(isClubAdmin || isPlatformAdmin) && (
+          <div className="mt-6">
+            <p className="mb-1 px-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
+              Club Admin
+            </p>
+            <ul className="space-y-1">
+              <li>
+                <Link
+                  href="/app/requests"
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                    pathname === "/app/requests" || pathname.startsWith("/app/requests/")
+                      ? "bg-blue-50 text-blue-700"
+                      : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                  )}
+                >
+                  <UserCheck
+                    className={cn(
+                      "h-4 w-4 shrink-0",
+                      pathname === "/app/requests" || pathname.startsWith("/app/requests/")
+                        ? "text-blue-600"
+                        : "text-gray-400"
+                    )}
+                  />
+                  <span className="flex-1">Access Requests</span>
+                  {pendingRequestsCount > 0 && (
+                    <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1.5 text-xs font-bold text-white">
+                      {pendingRequestsCount}
+                    </span>
+                  )}
+                </Link>
+              </li>
+            </ul>
+          </div>
+        )}
 
         {isPlatformAdmin && (
           <div className="mt-6">

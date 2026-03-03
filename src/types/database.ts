@@ -47,6 +47,30 @@ export interface AuditEvent {
   created_at: string;
 }
 
+export interface AccessCode {
+  id: string;
+  code: string;
+  tenant_id: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export type AccessRequestStatus = "pending" | "approved" | "rejected";
+
+export interface AccessRequest {
+  id: string;
+  tenant_id: string;
+  user_id: string | null;
+  first_name: string;
+  last_name: string;
+  email: string;
+  status: AccessRequestStatus;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
 export type Database = {
   public: {
     Tables: {
@@ -81,6 +105,24 @@ export type Database = {
           created_at?: string;
         };
         Update: Partial<Omit<AuditEvent, "id">>;
+        Relationships: [];
+      };
+      access_codes: {
+        Row: AccessCode;
+        Insert: Omit<AccessCode, "id" | "created_at"> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<Omit<AccessCode, "id">>;
+        Relationships: [];
+      };
+      access_requests: {
+        Row: AccessRequest;
+        Insert: Omit<AccessRequest, "id" | "created_at"> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<Omit<AccessRequest, "id">>;
         Relationships: [];
       };
     };
