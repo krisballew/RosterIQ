@@ -18,8 +18,20 @@ export default function ResetPasswordPage() {
     const supabase = createClient();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") {
-        setSessionReady(true);
+      // INITIAL_SESSION fires when the page loads with session cookies already set
+      // (the invite token_hash was exchanged server-side in /auth/callback).
+      // PASSWORD_RECOVERY fires for password-reset links.
+      // SIGNED_IN fires if the session is established client-side.
+      if (
+        event === "INITIAL_SESSION" ||
+        event === "PASSWORD_RECOVERY" ||
+        event === "SIGNED_IN"
+      ) {
+        // getSession() is still needed to confirm the session is non-null,
+        // because INITIAL_SESSION fires even when there is no active session.
+        supabase.auth.getSession().then(({ data }) => {
+          if (data.session) setSessionReady(true);
+        });
       }
     });
 
@@ -35,11 +47,6 @@ export default function ResetPasswordPage() {
         .then(({ data }) => {
           if (data.session) setSessionReady(true);
         });
-    } else {
-      // Came via server callback (token_hash flow) — session already set
-      supabase.auth.getSession().then(({ data }) => {
-        if (data.session) setSessionReady(true);
-      });
     }
 
     return () => subscription.unsubscribe();
