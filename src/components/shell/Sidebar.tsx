@@ -37,7 +37,7 @@ export function Sidebar({ isPlatformAdmin, isClubAdmin = false, pendingRequestsC
   return (
     <aside className="flex h-full w-64 flex-col border-r border-gray-200 bg-white">
       {/* Logo */}
-      <div className="flex h-16 items-center border-b border-gray-200 px-6">
+      <div className="flex h-16 items-center px-6">
         <div className="flex items-center gap-2 min-w-0">
           {currentTenant?.logo_url ? (
             // eslint-disable-next-line @next/next/no-img-element
