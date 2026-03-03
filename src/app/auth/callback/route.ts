@@ -7,6 +7,7 @@ export const runtime = "nodejs";
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
+  const type = searchParams.get("type");
   const next = searchParams.get("next") ?? "/portal";
 
   if (code) {
@@ -15,12 +16,14 @@ export async function GET(request: Request) {
     if (!error) {
       const forwardedHost = request.headers.get("x-forwarded-host");
       const isLocalEnv = process.env.NODE_ENV === "development";
+      // Password recovery — send to reset page instead of portal
+      const destination = type === "recovery" ? "/auth/reset-password" : next;
       if (isLocalEnv) {
-        return NextResponse.redirect(`${origin}${next}`);
+        return NextResponse.redirect(`${origin}${destination}`);
       } else if (forwardedHost) {
-        return NextResponse.redirect(`https://${forwardedHost}${next}`);
+        return NextResponse.redirect(`https://${forwardedHost}${destination}`);
       } else {
-        return NextResponse.redirect(`${origin}${next}`);
+        return NextResponse.redirect(`${origin}${destination}`);
       }
     }
   }
