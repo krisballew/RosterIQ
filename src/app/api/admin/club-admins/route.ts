@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(".supabase.co", ".vercel.app") ||
     "http://localhost:3000";
 
-  const redirectTo = `${baseUrl}/auth/callback?next=/portal`;
+  const redirectTo = `${baseUrl}/auth/callback?type=invite`;
 
   // Send invite email via Supabase (creates user + sends invite)
   const { data: inviteData, error: inviteError } =
