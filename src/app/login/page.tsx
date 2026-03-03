@@ -16,6 +16,33 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [forgotMode, setForgotMode] = useState(false);
+  const [forgotSent, setForgotSent] = useState(false);
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotError, setForgotError] = useState<string | null>(null);
+
+  async function handleForgotPassword(e: React.FormEvent) {
+    e.preventDefault();
+    if (!email.trim()) {
+      setForgotError("Enter your email address above first.");
+      return;
+    }
+    setForgotLoading(true);
+    setForgotError(null);
+    const supabase = createClient();
+    const redirectTo =
+      (process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin) +
+      "/auth/callback?type=recovery";
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo,
+    });
+    setForgotLoading(false);
+    if (error) {
+      setForgotError(error.message);
+    } else {
+      setForgotSent(true);
+    }
+  }
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -64,12 +91,38 @@ function LoginForm() {
         />
       </div>
 
-      <a
-        href="#"
-        className="text-sm text-[#0d6e7a] hover:underline self-start -mt-1"
-      >
-        Forgot Password?
-      </a>
+      {forgotSent ? (
+        <p className="text-xs text-green-600 -mt-1">
+          Check your email for a password reset link.
+        </p>
+      ) : forgotMode ? (
+        <div className="-mt-1 flex flex-col gap-1">
+          <button
+            type="button"
+            onClick={handleForgotPassword}
+            disabled={forgotLoading}
+            className="text-sm text-[#0d6e7a] hover:underline self-start disabled:opacity-50"
+          >
+            {forgotLoading ? "Sending…" : "Send reset link →"}
+          </button>
+          {forgotError && <p className="text-xs text-red-500">{forgotError}</p>}
+          <button
+            type="button"
+            onClick={() => { setForgotMode(false); setForgotError(null); }}
+            className="text-xs text-gray-400 hover:underline self-start"
+          >
+            Cancel
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setForgotMode(true)}
+          className="text-sm text-[#0d6e7a] hover:underline self-start -mt-1"
+        >
+          Forgot Password?
+        </button>
+      )}
 
       <div className="mt-4" />
 
