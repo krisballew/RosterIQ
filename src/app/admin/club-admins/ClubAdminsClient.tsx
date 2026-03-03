@@ -13,6 +13,10 @@ import {
   Send,
   RefreshCw,
   Clock,
+  MoreHorizontal,
+  UserX,
+  Trash2,
+  XCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,6 +36,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import type { Tenant } from "@/types/database";
 
 const ADMIN_ROLES = [
@@ -78,6 +89,29 @@ export function ClubAdminsClient({ initialAdmins, tenants }: ClubAdminsClientPro
   const [resendingId, setResendingId] = useState<string | null>(null);
   const [resentId, setResentId] = useState<string | null>(null);
   const [resendError, setResendError] = useState<string | null>(null);
+  const [confirmAction, setConfirmAction] = useState<{ row: ClubAdminRow; type: "deactivate" | "delete" } | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  async function handleConfirmAction() {
+    if (!confirmAction) return;
+    setActionLoading(true);
+    setActionError(null);
+    const { row, type } = confirmAction;
+    const res = await fetch(`/api/admin/club-admins/${row.id}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ deleteUser: type === "delete" }),
+    });
+    setActionLoading(false);
+    if (res.ok) {
+      setConfirmAction(null);
+      router.refresh();
+    } else {
+      const body = await res.json().catch(() => ({}));
+      setActionError(body.error ?? "Action failed");
+    }
+  }
 
   async function handleResendInvite(adminRow: ClubAdminRow) {
     setResendingId(adminRow.id);
@@ -312,6 +346,7 @@ export function ClubAdminsClient({ initialAdmins, tenants }: ClubAdminsClientPro
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                     {showResend ? "Invited" : "Last Login"}
                   </th>
+                  <th className="px-4 py-3" />
                   {showResend && <th className="px-4 py-3" />}
                 </tr>
               </thead>
@@ -393,6 +428,32 @@ export function ClubAdminsClient({ initialAdmins, tenants }: ClubAdminsClientPro
                           )}
                         </td>
                       )}
+                      <td className="px-4 py-3 text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button className="rounded p-1 hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              className="gap-2 text-amber-600 focus:text-amber-600 focus:bg-amber-50"
+                              onClick={() => setConfirmAction({ row: a, type: "deactivate" })}
+                            >
+                              <UserX className="h-3.5 w-3.5" />
+                              Deactivate
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="gap-2 text-red-600 focus:text-red-600 focus:bg-red-50"
+                              onClick={() => setConfirmAction({ row: a, type: "delete" })}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              Delete user
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </td>
                     </tr>
                   );
                 })}
@@ -449,6 +510,51 @@ export function ClubAdminsClient({ initialAdmins, tenants }: ClubAdminsClientPro
           </div>
         );
       })()}
+
+      {/* Confirmation modal for deactivate / delete */}
+      {confirmAction && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 flex flex-col gap-4">
+            <div className="flex items-start gap-3">
+              <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${confirmAction.type === "delete" ? "bg-red-100" : "bg-amber-100"}`}>
+                {confirmAction.type === "delete"
+                  ? <Trash2 className="h-5 w-5 text-red-600" />
+                  : <UserX className="h-5 w-5 text-amber-600" />}
+              </div>
+              <div>
+                <h2 className="text-sm font-semibold text-gray-900">
+                  {confirmAction.type === "delete" ? "Delete user?" : "Deactivate administrator?"}
+                </h2>
+                <p className="mt-1 text-xs text-gray-500">
+                  {confirmAction.type === "delete"
+                    ? <>This will permanently remove <span className="font-medium text-gray-700">{confirmAction.row.email}</span> from RosterIQ and delete their login account. This cannot be undone.</>
+                    : <>This will remove <span className="font-medium text-gray-700">{confirmAction.row.email}</span>&apos;s access to RosterIQ. Their account will remain and can be re-invited.</>}
+                </p>
+              </div>
+            </div>
+            {actionError && (
+              <p className="text-xs text-red-500">{actionError}</p>
+            )}
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                onClick={() => { setConfirmAction(null); setActionError(null); }}
+                disabled={actionLoading}
+                className="px-3 py-1.5 text-sm rounded-md border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmAction}
+                disabled={actionLoading}
+                className={`px-3 py-1.5 text-sm rounded-md font-medium text-white disabled:opacity-50 flex items-center gap-1.5 ${confirmAction.type === "delete" ? "bg-red-600 hover:bg-red-700" : "bg-amber-500 hover:bg-amber-600"}`}
+              >
+                {actionLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                {confirmAction.type === "delete" ? "Delete user" : "Deactivate"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
