@@ -72,6 +72,10 @@ export async function POST(req: NextRequest) {
     "http://localhost:3000";
 
   const redirectTo = `${baseUrl}/auth/callback?type=invite`;
+  // For resetPasswordForEmail fallback — must go directly to the client page,
+  // NOT through the server callback route, because Supabase sends hash fragments
+  // that server route handlers cannot read.
+  const resetRedirectTo = `${baseUrl}/auth/reset-password`;
 
   // Send invite email via Supabase (creates user + sends invite)
   const { data: inviteData, error: inviteError } =
@@ -92,7 +96,7 @@ export async function POST(req: NextRequest) {
         options: { redirectTo },
       });
       // generateLink doesn't send email itself — use resetPasswordForEmail which uses Supabase SMTP
-      await admin.auth.resetPasswordForEmail(email.trim().toLowerCase(), { redirectTo });
+      await admin.auth.resetPasswordForEmail(email.trim().toLowerCase(), { redirectTo: resetRedirectTo });
       void resetError; // best-effort; continue to create membership regardless
     } else {
       return NextResponse.json({ error: inviteError.message }, { status: 422 });

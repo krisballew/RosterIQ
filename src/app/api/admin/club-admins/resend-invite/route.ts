@@ -24,6 +24,8 @@ export async function POST(req: NextRequest) {
   const admin = createAdminClient();
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
   const redirectTo = `${baseUrl}/auth/callback?type=invite`;
+  // resetPasswordForEmail uses hash fragments — must land on a client page, not a server route
+  const resetRedirectTo = `${baseUrl}/auth/reset-password`;
 
   // Try a fresh invite (succeeds when the user was deleted from Supabase)
   const { data: inviteData, error: inviteError } = await admin.auth.admin.inviteUserByEmail(
@@ -35,7 +37,7 @@ export async function POST(req: NextRequest) {
     // User still exists in Supabase — send a password reset / set-password email
     const { error: resetError } = await admin.auth.resetPasswordForEmail(
       email.trim().toLowerCase(),
-      { redirectTo }
+      { redirectTo: resetRedirectTo }
     );
     if (resetError) {
       return NextResponse.json({ error: resetError.message }, { status: 422 });

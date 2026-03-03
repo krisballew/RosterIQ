@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
@@ -11,6 +11,24 @@ export default function ResetPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  // Track whether Supabase has established the session from the email link
+  const [sessionReady, setSessionReady] = useState(false);
+
+  useEffect(() => {
+    const supabase = createClient();
+    // Supabase SSR browser client auto-processes hash tokens on load.
+    // We wait for the PASSWORD_RECOVERY or SIGNED_IN event before allowing submit.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") {
+        setSessionReady(true);
+      }
+    });
+    // Also check if a session already exists (e.g. came via token_hash callback)
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) setSessionReady(true);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -76,6 +94,14 @@ export default function ResetPasswordPage() {
                 </div>
                 <p className="text-sm font-medium text-gray-900">Password updated!</p>
                 <p className="text-xs text-gray-500 mt-1">Redirecting you now…</p>
+              </div>
+            ) : !sessionReady ? (
+              <div className="flex flex-col items-center justify-center py-8 gap-3 text-gray-400">
+                <svg className="animate-spin h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                </svg>
+                <p className="text-sm">Verifying your link…</p>
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="flex flex-col gap-4">
