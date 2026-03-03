@@ -47,6 +47,7 @@ export interface ClubAdminRow {
   role: string;
   created_at: string;
   email: string;
+  registered_at: string | null;
   profiles: { first_name: string | null; last_name: string | null; last_login_at: string | null } | null;
   tenants: { name: string } | null;
 }
@@ -308,6 +309,7 @@ export function ClubAdminsClient({ initialAdmins, tenants }: ClubAdminsClientPro
                   <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Administrator</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Tenant</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Role</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Registration</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                     {showResend ? "Invited" : "Last Login"}
                   </th>
@@ -342,6 +344,20 @@ export function ClubAdminsClient({ initialAdmins, tenants }: ClubAdminsClientPro
                         <Badge className={ROLE_COLORS[a.role] ?? "bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-100"}>
                           {ROLE_LABELS[a.role] ?? a.role}
                         </Badge>
+                      </td>
+                      <td className="px-4 py-3">
+                        {a.registered_at ? (
+                          <div className="flex flex-col gap-0.5">
+                            <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700">
+                              <CheckCircle className="h-3.5 w-3.5" /> Registered
+                            </span>
+                            <span className="text-xs text-gray-400">{new Date(a.registered_at).toLocaleDateString()}</span>
+                          </div>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-600">
+                            <Clock className="h-3.5 w-3.5" /> Awaiting
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-gray-500">
                         {showResend ? (

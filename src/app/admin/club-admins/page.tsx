@@ -25,6 +25,9 @@ export default async function AdminClubAdminsPage() {
   const emailMap = Object.fromEntries(
     (usersData?.users ?? []).map((u) => [u.id, u.email ?? ""])
   );
+  const registeredAtMap = Object.fromEntries(
+    (usersData?.users ?? []).map((u) => [u.id, u.email_confirmed_at ?? null])
+  );
   const profileMap = Object.fromEntries(
     (profiles ?? []).map((p) => [p.user_id, p])
   );
@@ -33,6 +36,7 @@ export default async function AdminClubAdminsPage() {
   const adminsWithEmail = (memberships ?? []).map((a) => ({
     ...a,
     email: emailMap[a.user_id] ?? "",
+    registered_at: registeredAtMap[a.user_id] ?? null,
     profiles: profileMap[a.user_id] ?? null,
   }));
 
