@@ -62,6 +62,53 @@ function LoginForm() {
     router.refresh();
   }
 
+  if (forgotMode) {
+    return (
+      <form onSubmit={handleForgotPassword} className="flex flex-col gap-4">
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">
+            Email address
+          </label>
+          <input
+            type="email"
+            placeholder="you@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            autoComplete="email"
+            className="w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-[#0d6e7a] focus:ring-2 focus:ring-[#0d6e7a]/20 transition"
+          />
+        </div>
+
+        {forgotSent ? (
+          <p className="text-xs text-green-600">
+            Check your email for a password reset link.
+          </p>
+        ) : (
+          <>
+            {forgotError && <p className="text-xs text-red-500">{forgotError}</p>}
+            <button
+              type="submit"
+              disabled={forgotLoading}
+              className="w-full rounded-md py-2.5 text-sm font-semibold text-white transition disabled:opacity-50"
+              style={{ backgroundColor: "#0d6e7a" }}
+            >
+              {forgotLoading ? "Sending…" : "Send reset link"}
+            </button>
+          </>
+        )}
+
+        <button
+          type="button"
+          onClick={() => { setForgotMode(false); setForgotError(null); setForgotSent(false); }}
+          className="text-sm text-gray-500 hover:underline self-start"
+        >
+          ← Back to sign in
+        </button>
+      </form>
+    );
+  }
+
   return (
     <form onSubmit={handleLogin} className="flex flex-col gap-4">
       <div>
@@ -91,38 +138,13 @@ function LoginForm() {
         />
       </div>
 
-      {forgotSent ? (
-        <p className="text-xs text-green-600 -mt-1">
-          Check your email for a password reset link.
-        </p>
-      ) : forgotMode ? (
-        <div className="-mt-1 flex flex-col gap-1">
-          <button
-            type="button"
-            onClick={handleForgotPassword}
-            disabled={forgotLoading}
-            className="text-sm text-[#0d6e7a] hover:underline self-start disabled:opacity-50"
-          >
-            {forgotLoading ? "Sending…" : "Send reset link →"}
-          </button>
-          {forgotError && <p className="text-xs text-red-500">{forgotError}</p>}
-          <button
-            type="button"
-            onClick={() => { setForgotMode(false); setForgotError(null); }}
-            className="text-xs text-gray-400 hover:underline self-start"
-          >
-            Cancel
-          </button>
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setForgotMode(true)}
-          className="text-sm text-[#0d6e7a] hover:underline self-start -mt-1"
-        >
-          Forgot Password?
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={() => setForgotMode(true)}
+        className="text-sm text-[#0d6e7a] hover:underline self-start -mt-1"
+      >
+        Forgot Password?
+      </button>
 
       <div className="mt-4" />
 
