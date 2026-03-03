@@ -23,8 +23,8 @@ export async function POST(req: NextRequest) {
 
   const admin = createAdminClient();
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-  const redirectTo = `${baseUrl}/auth/callback?type=invite`;
-  // resetPasswordForEmail uses hash fragments — must land on a client page, not a server route
+  // Both flows use hash fragments — must land on client page, not server route handler
+  const redirectTo = `${baseUrl}/auth/reset-password`;
   const resetRedirectTo = `${baseUrl}/auth/reset-password`;
 
   // Try a fresh invite (succeeds when the user was deleted from Supabase)

@@ -71,10 +71,9 @@ export async function POST(req: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(".supabase.co", ".vercel.app") ||
     "http://localhost:3000";
 
-  const redirectTo = `${baseUrl}/auth/callback?type=invite`;
-  // For resetPasswordForEmail fallback — must go directly to the client page,
-  // NOT through the server callback route, because Supabase sends hash fragments
-  // that server route handlers cannot read.
+  // Both invite and reset flows use hash fragments from Supabase's verify endpoint.
+  // Must land on the client-side page — server routes cannot read hash fragments.
+  const redirectTo = `${baseUrl}/auth/reset-password`;
   const resetRedirectTo = `${baseUrl}/auth/reset-password`;
 
   // Send invite email via Supabase (creates user + sends invite)
