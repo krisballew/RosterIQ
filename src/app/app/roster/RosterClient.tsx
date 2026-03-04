@@ -1081,6 +1081,11 @@ export function RosterClient({ initialPlayers, initialTeams }: RosterClientProps
   const [deactivatePlayer, setDeactivatePlayer] = useState<Player | null>(null);
   const [deactivating, setDeactivating] = useState(false);
 
+  // Delete player confirm
+  const [deletePlayer, setDeletePlayer] = useState<Player | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
   // Team management dialog
   const [teamsDialogOpen, setTeamsDialogOpen] = useState(false);
   const [addTeamOpen, setAddTeamOpen] = useState(false);
@@ -1215,6 +1220,24 @@ export function RosterClient({ initialPlayers, initialTeams }: RosterClientProps
     } finally {
       setDeactivating(false);
       setDeactivatePlayer(null);
+    }
+  };
+
+  // ── Delete player (hard delete) ────────────────────────────
+  const handleDeletePlayer = async () => {
+    if (!deletePlayer) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      const res = await fetch(`/api/app/players/${deletePlayer.id}`, { method: "DELETE" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Failed to delete player");
+      setPlayers((prev) => prev.filter((p) => p.id !== deletePlayer.id));
+      setDeletePlayer(null);
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -1597,6 +1620,14 @@ export function RosterClient({ initialPlayers, initialTeams }: RosterClientProps
                               <UserCheck className="h-3.5 w-3.5 text-green-500" />
                             )}
                           </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => { setDeleteError(null); setDeletePlayer(player); }}
+                            title="Delete player record"
+                          >
+                            <Trash2 className="h-3.5 w-3.5 text-red-400" />
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -1672,6 +1703,40 @@ export function RosterClient({ initialPlayers, initialTeams }: RosterClientProps
             >
               {deactivating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {deactivatePlayer?.status === "active" ? "Deactivate" : "Reactivate"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete player confirm dialog */}
+      <Dialog open={!!deletePlayer} onOpenChange={(open) => { if (!open) { setDeletePlayer(null); setDeleteError(null); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <Trash2 className="h-5 w-5" /> Delete Player Record
+            </DialogTitle>
+            <DialogDescription>
+              Permanently delete{" "}
+              <span className="font-semibold text-gray-900">
+                {deletePlayer?.first_name} {deletePlayer?.last_name}
+              </span>
+              ? This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          {deleteError && (
+            <p className="text-sm text-red-600 bg-red-50 rounded-md px-3 py-2">{deleteError}</p>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => { setDeletePlayer(null); setDeleteError(null); }}
+              disabled={deleting}
+            >
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDeletePlayer} disabled={deleting}>
+              {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Delete
             </Button>
           </DialogFooter>
         </DialogContent>

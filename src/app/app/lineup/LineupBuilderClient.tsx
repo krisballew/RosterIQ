@@ -26,6 +26,8 @@ import {
   GripVertical,
   FolderOpen,
   Trash2,
+  Check,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -45,6 +47,14 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import {
   FORMATIONS,
@@ -254,7 +264,7 @@ function TeamColumn({
     <div
       ref={setNodeRef}
       className={cn(
-        "flex flex-col rounded-xl border-2 bg-white shadow-sm min-w-[200px] flex-1 transition-colors",
+        "flex flex-col rounded-xl border-2 bg-white shadow-sm flex-1 min-w-0 transition-colors",
         isOver ? "border-blue-400 bg-blue-50" : "border-gray-200"
       )}
     >
@@ -278,7 +288,7 @@ function TeamColumn({
       </div>
 
       {/* Player list */}
-      <div className="flex flex-col gap-1.5 p-2 flex-1 min-h-[120px]">
+      <div className="flex flex-col gap-1.5 p-2 flex-1 overflow-y-auto min-h-[120px]">
         {players.map((p) => (
           <PlayerCard
             key={p.id}
@@ -755,6 +765,15 @@ export function LineupBuilderClient({ initialTeams, initialUnassigned }: LineupB
   });
 
   const sim = sandboxHistory.present;
+
+  // ── Sandbox team visibility (max 5 teams) ─────────────────────────────────
+  const [sandboxVisibleTeamIds, setSandboxVisibleTeamIds] = useState<Set<string>>(
+    () => new Set(initialTeams.slice(0, 5).map((t) => t.id))
+  );
+  const [sandboxTeamFilterOpen, setSandboxTeamFilterOpen] = useState(false);
+  const [pendingSandboxTeamIds, setPendingSandboxTeamIds] = useState<Set<string>>(
+    () => new Set(initialTeams.slice(0, 5).map((t) => t.id))
+  );
 
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
