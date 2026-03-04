@@ -23,9 +23,38 @@ export interface Player {
   primary_parent_email: string | null;
   secondary_parent_email: string | null;
   status: PlayerStatus;
+  /** Preferred positions, e.g. ["ST", "RW"] */
+  positions: string[];
+  /** Birth year for age eligibility checks */
+  birth_year: number | null;
   created_at: string;
   updated_at: string;
 }
+
+export interface Team {
+  id: string;
+  tenant_id: string;
+  name: string;
+  age_division: string | null;
+  /** Eligibility birth year for the team */
+  birth_year: number | null;
+  roster_limit: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Lineup {
+  id: string;
+  tenant_id: string;
+  team_id: string;
+  formation: FormationKey;
+  /** Map of slotKey → player_id | null */
+  slots: Record<string, string | null>;
+  created_at: string;
+  updated_at: string;
+}
+
+export type FormationKey = "4-3-3" | "4-4-2" | "3-5-2";
 
 export interface Tenant {
   id: string;
@@ -150,6 +179,26 @@ export type Database = {
           updated_at?: string;
         };
         Update: Partial<Omit<Player, "id" | "tenant_id">>;
+        Relationships: [];
+      };
+      teams: {
+        Row: Team;
+        Insert: Omit<Team, "id" | "created_at" | "updated_at"> & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<Team, "id" | "tenant_id">>;
+        Relationships: [];
+      };
+      lineups: {
+        Row: Lineup;
+        Insert: Omit<Lineup, "id" | "created_at" | "updated_at"> & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<Lineup, "id" | "tenant_id">>;
         Relationships: [];
       };
     };

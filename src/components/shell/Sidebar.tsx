@@ -11,6 +11,7 @@ import {
   MapPin,
   Shield,
   UserCheck,
+  Layers,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Tenant } from "@/types/database";
@@ -18,6 +19,7 @@ import type { Tenant } from "@/types/database";
 const navItems = [
   { href: "/app/home", label: "Home", icon: LayoutDashboard },
   { href: "/app/roster", label: "Roster Management", icon: Users },
+  { href: "/app/lineup", label: "Lineup Builder", icon: Layers },
   { href: "/app/reviews", label: "Player Reviews", icon: ClipboardList },
   { href: "/app/education", label: "Education", icon: BookOpen },
   { href: "/app/recruitment", label: "Recruitment", icon: Search },
