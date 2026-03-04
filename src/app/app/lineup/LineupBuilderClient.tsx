@@ -237,13 +237,17 @@ function PlayerCard({
       className={cn(
         "flex items-center gap-2 rounded-md border bg-white px-2 py-1.5 text-sm select-none cursor-grab active:cursor-grabbing transition-shadow",
         isDragging ? "opacity-40 shadow-lg" : "shadow-sm hover:shadow-md",
-        compact ? "text-xs px-1.5 py-1" : ""
+        compact ? "text-xs px-1.5 py-1" : "",
+        player.status === "practice_only" ? "border-amber-300 bg-amber-50" : ""
       )}
     >
       <GripVertical className="h-3 w-3 shrink-0 text-gray-300" />
       <span className="flex-1 truncate font-medium">
         {player.first_name} {player.last_name}
       </span>
+      {player.status === "practice_only" && (
+        <span className="text-[10px] font-semibold text-amber-600 bg-amber-100 rounded px-1 shrink-0 leading-4">P</span>
+      )}
       {showDivision && player.age_division && (
         <span className="text-[10px] text-gray-400 bg-gray-100 rounded px-1 shrink-0 leading-4">
           {player.age_division}

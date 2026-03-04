@@ -33,11 +33,12 @@ export default async function LineupPage() {
     .eq("tenant_id", tenantId)
     .order("name");
 
-  // Fetch all players for tenant
+  // Fetch all players for tenant — exclude inactive
   const { data: playersData } = await supabase
     .from("players")
     .select("*")
     .eq("tenant_id", tenantId)
+    .neq("status", "inactive")
     .order("last_name")
     .order("first_name");
 
