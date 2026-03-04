@@ -524,11 +524,13 @@ function ImportPlayersDialog({
   open,
   onOpenChange,
   teams,
+  existingPlayers,
   onImported,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   teams: Team[];
+  existingPlayers: Player[];
   onImported: (players: Player[]) => void;
 }) {
   const [step, setStep] = useState<"upload" | "preview" | "done">("upload");
@@ -576,6 +578,32 @@ function ImportPlayersDialog({
     if (file) handleFile(file);
   };
 
+  // Pre-compute a Set of keys for existing players to detect duplicates in preview
+  const existingKeys = useMemo(
+    () =>
+      new Set(
+        existingPlayers.map(
+          (p) =>
+            `${p.first_name.trim().toLowerCase()}|${p.last_name.trim().toLowerCase()}|${p.date_of_birth ?? ""}`
+        )
+      ),
+    [existingPlayers]
+  );
+
+  // Mark each parsed row as a duplicate or not
+  const parsedWithDup = useMemo(() => {
+    const seen = new Set<string>();
+    return parsed.map((p) => {
+      const key = `${p.first_name.toLowerCase()}|${p.last_name.toLowerCase()}|${p.date_of_birth ?? ""}`;
+      const isDuplicate = existingKeys.has(key) || seen.has(key);
+      seen.add(key);
+      return { ...p, isDuplicate };
+    });
+  }, [parsed, existingKeys]);
+
+  const newCount = parsedWithDup.filter((p) => !p.isDuplicate).length;
+  const dupCount = parsedWithDup.filter((p) => p.isDuplicate).length;
+
   // Resolve effective team for a player given the current override
   const resolveTeam = (p: ImportedPlayer): string | null => {
     if (defaultTeam === "__keep__") return p.team_assigned;
@@ -586,11 +614,13 @@ function ImportPlayersDialog({
   const handleImport = async () => {
     setImporting(true);
     try {
-      const payload = parsed.map((p) => ({
-        ...p,
-        team_assigned: resolveTeam(p),
-        status: "active" as const,
-      }));
+      const payload = parsedWithDup
+        .filter((p) => !p.isDuplicate)  // skip known duplicates before sending
+        .map((p) => ({
+          ...p,
+          team_assigned: resolveTeam(p),
+          status: "active" as const,
+        }));
       const res = await fetch("/api/app/players/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -690,7 +720,15 @@ function ImportPlayersDialog({
             <div className="py-4 space-y-4">
               <div className="flex items-center justify-between">
                 <p className="text-sm text-gray-700">
-                  Found <strong>{parsed.length}</strong> player{parsed.length !== 1 ? "s" : ""}. Review before importing.
+                  Found <strong>{parsed.length}</strong> player{parsed.length !== 1 ? "s" : ""} in CSV.
+                {dupCount > 0 ? (
+                  <span>
+                    {" "}<strong className="text-green-700">{newCount} new</strong>,{" "}
+                    <span className="text-amber-600">{dupCount} already exist</span> (will be skipped).
+                  </span>
+                ) : (
+                  <span> All are new.</span>
+                )}
                 </p>
                 <Button variant="ghost" size="sm" onClick={reset}>Start over</Button>
               </div>
@@ -723,18 +761,30 @@ function ImportPlayersDialog({
                       <th className="px-3 py-2 text-left">Team</th>
                       <th className="px-3 py-2 text-left">Primary Email</th>
                       <th className="px-3 py-2 text-left">Positions</th>
+                      <th className="px-3 py-2 text-left"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
-                    {parsed.map((p, i) => (
-                      <tr key={i} className="hover:bg-gray-50/60">
+                    {parsedWithDup.map((p, i) => (
+                      <tr key={i} className={p.isDuplicate ? "bg-amber-50" : "hover:bg-gray-50/60"}>
                         <td className="px-3 py-1.5 text-gray-400">{i + 1}</td>
-                        <td className="px-3 py-1.5 text-gray-900">{p.first_name}</td>
-                        <td className="px-3 py-1.5 text-gray-900">{p.last_name}</td>
+                        <td className="px-3 py-1.5">
+                          <span className={p.isDuplicate ? "text-gray-400 line-through" : "text-gray-900"}>{p.first_name}</span>
+                        </td>
+                        <td className="px-3 py-1.5">
+                          <span className={p.isDuplicate ? "text-gray-400 line-through" : "text-gray-900"}>{p.last_name}</span>
+                        </td>
                         <td className="px-3 py-1.5 text-gray-600">{p.date_of_birth || "—"}</td>
                         <td className="px-3 py-1.5 text-gray-600">{resolveTeam(p) || "—"}</td>
                         <td className="px-3 py-1.5 text-gray-600 max-w-[160px] truncate">{p.primary_parent_email || "—"}</td>
                         <td className="px-3 py-1.5 text-gray-600">{p.positions.join(", ") || "—"}</td>
+                        <td className="px-3 py-1.5">
+                          {p.isDuplicate && (
+                            <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium bg-amber-100 text-amber-700 border border-amber-200 whitespace-nowrap">
+                              already exists
+                            </span>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -788,9 +838,9 @@ function ImportPlayersDialog({
           {step === "preview" && (
             <>
               <Button variant="outline" onClick={reset} disabled={importing}>Back</Button>
-              <Button onClick={handleImport} disabled={importing}>
+              <Button onClick={handleImport} disabled={importing || newCount === 0}>
                 {importing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Import {parsed.length} Player{parsed.length !== 1 ? "s" : ""}
+                Import {newCount} New Player{newCount !== 1 ? "s" : ""}
               </Button>
             </>
           )}
@@ -1736,6 +1786,7 @@ export function RosterClient({ initialPlayers, initialTeams }: RosterClientProps
         open={importOpen}
         onOpenChange={setImportOpen}
         teams={teams}
+        existingPlayers={players}
         onImported={(freshPlayers) => setPlayers(freshPlayers)}
       />
 
