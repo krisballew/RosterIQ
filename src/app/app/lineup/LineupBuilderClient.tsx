@@ -1031,7 +1031,7 @@ export function LineupBuilderClient({ initialTeams, initialUnassigned }: LineupB
             {selectedLineupTeamId ? (
               <div className="flex gap-4 flex-1 overflow-auto">
                 {/* Field */}
-                <div className="w-[280px] shrink-0">
+                <div className="w-[560px] shrink-0">
                   <SoccerField
                     formation={lineupState.formation}
                     slots={lineupState.slots}
@@ -1040,13 +1040,13 @@ export function LineupBuilderClient({ initialTeams, initialUnassigned }: LineupB
                 </div>
 
                 {/* Bench */}
-                <div className="flex-1 flex flex-col gap-2">
+                <div className="w-64 shrink-0 flex flex-col gap-2">
                   <p className="text-xs text-gray-500 font-medium">
                     Team: <strong className="text-gray-800">{lineupTeam?.name}</strong>
                     &nbsp;·&nbsp;Formation: <strong className="text-gray-800">{lineupState.formation}</strong>
-                    &nbsp;·&nbsp;Placed:{" "}
+                    &nbsp;·&nbsp;Starters:{" "}
                     <strong className="text-gray-800">
-                      {Object.values(lineupState.slots).filter(Boolean).length}/{FORMATIONS[lineupState.formation].length}
+                      {starterCount}/{slotCount}
                     </strong>
                   </p>
                   <BenchArea players={lineupState.bench} warningPlayerIds={lineupWarnIds} />
