@@ -1347,6 +1347,21 @@ export function LineupBuilderClient({ initialTeams, initialUnassigned }: LineupB
                 </DropdownMenuContent>
               </DropdownMenu>
 
+              {/* Add Team button */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setVirtualTeamName("");
+                  setVirtualTeamDivision("");
+                  setVirtualTeamLimit("16");
+                  setAddVirtualTeamOpen(true);
+                }}
+              >
+                <Plus className="h-3.5 w-3.5 mr-1" />
+                Add Team
+              </Button>
+
               <div className="flex-1" />
               {hasSandboxChanges && (
                 <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
