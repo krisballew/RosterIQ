@@ -211,11 +211,13 @@ function PlayerCard({
   hasWarning,
   dragData,
   compact = false,
+  showDivision = false,
 }: {
   player: Player;
   hasWarning: boolean;
   dragData: DragData;
   compact?: boolean;
+  showDivision?: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `draggable:${player.id}:${dragData.fromTeamId ?? (dragData.fromBench ? "bench" : "")}`,
@@ -242,6 +244,11 @@ function PlayerCard({
       <span className="flex-1 truncate font-medium">
         {player.first_name} {player.last_name}
       </span>
+      {showDivision && player.age_division && (
+        <span className="text-[10px] text-gray-400 bg-gray-100 rounded px-1 shrink-0 leading-4">
+          {player.age_division}
+        </span>
+      )}
       {player.positions && player.positions.length > 0 && (
         <span className="text-xs text-gray-400 shrink-0">
           {player.positions.slice(0, 2).join("/")}
@@ -310,6 +317,7 @@ function TeamColumn({
             player={p}
             hasWarning={warningPlayerIds.has(p.id)}
             dragData={{ type: "player", player: p, fromTeamId: team.id }}
+            showDivision
           />
         ))}
         {players.length === 0 && (
@@ -346,6 +354,7 @@ function UnassignedColumn({ players, warningPlayerIds }: { players: Player[]; wa
             player={p}
             hasWarning={warningPlayerIds.has(p.id)}
             dragData={{ type: "player", player: p, fromTeamId: "unassigned" }}
+            showDivision
           />
         ))}
         {players.length === 0 && (
