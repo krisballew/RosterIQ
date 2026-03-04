@@ -376,10 +376,6 @@ function TeamFormDialog({ open, onOpenChange, initialData, title, onSubmit, subm
             <Input id="t_div" value={form.age_division} onChange={(e) => set("age_division", e.target.value)} placeholder="e.g. U14" />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="t_year">Birth Year</Label>
-            <Input id="t_year" type="number" value={form.birth_year} onChange={(e) => set("birth_year", e.target.value)} placeholder="e.g. 2011" />
-          </div>
-          <div className="space-y-1">
             <Label htmlFor="t_limit">Roster Limit</Label>
             <Input id="t_limit" type="number" value={form.roster_limit} onChange={(e) => set("roster_limit", e.target.value)} placeholder="16" />
           </div>
