@@ -54,7 +54,11 @@ export interface Lineup {
   updated_at: string;
 }
 
-export type FormationKey = "4-3-3" | "4-4-2" | "3-5-2";
+export type FormationKey =
+  | "4v4-1-2" | "4v4-2-1"
+  | "7v7-2-3-1" | "7v7-3-2-1" | "7v7-1-3-2"
+  | "9v9-3-3-2" | "9v9-2-4-2" | "9v9-3-2-3"
+  | "11v11-4-3-3" | "11v11-4-4-2" | "11v11-3-5-2";
 
 export interface Tenant {
   id: string;

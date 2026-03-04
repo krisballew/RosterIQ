@@ -37,12 +37,18 @@ import {
 import { cn } from "@/lib/utils";
 import {
   FORMATIONS,
-  FORMATION_KEYS,
+  FORMAT_FORMATIONS,
+  GAME_FORMATS,
+  GAME_FORMAT_LABELS,
+  getFormationLabel,
   computeRosterWarnings,
   computeLineupWarnings,
   type TeamWithPlayers,
   type Player,
   type FormationKey,
+  type GameFormat,
+  type LineupSlots,
+  type SlotPlayers,
   type RosterMap,
   type SimState,
   type Warning,
@@ -145,7 +151,8 @@ function sandboxReducer(state: SandboxHistory, action: SandboxAction): SandboxHi
 // ─────────────────────────────────────────────────────────────────────────────
 interface LineupState {
   formation: FormationKey;
-  slots: Record<string, Player | null>;
+  /** Per-slot depth chart: slotKey → { starter, backup } */
+  slots: LineupSlots;
   bench: Player[];
 }
 
@@ -156,8 +163,10 @@ interface LineupState {
 interface DragData {
   type: "player";
   player: Player;
-  fromTeamId?: string;       // sandbox
-  fromSlot?: string;         // lineup slot key or "bench"
+  fromTeamId?: string;             // sandbox roster column
+  fromBench?: boolean;             // lineup bench pool
+  fromSlotKey?: string;            // lineup: which slot
+  fromSlotRole?: "starter" | "backup"; // lineup: which role in that slot
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -176,7 +185,7 @@ function PlayerCard({
   compact?: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id: `player:${player.id}:${dragData.fromSlot ?? dragData.fromTeamId ?? ""}`,
+    id: `draggable:${player.id}:${dragData.fromTeamId ?? (dragData.fromBench ? "bench" : "")}`,
     data: dragData,
   });
 
@@ -348,71 +357,107 @@ function WarningsPanel({ warnings }: { warnings: Warning[] }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Formation Field – one droppable slot
+// Formation Field – one droppable slot (starter circle + backup pill)
 // ─────────────────────────────────────────────────────────────────────────────
 
 function FormationSlotDot({
   slotKey,
   label,
-  player,
-  hasWarning,
+  slotPlayers,
+  warnStarter,
+  warnBackup,
   x,
   y,
 }: {
   slotKey: string;
   label: string;
-  player: Player | null;
-  hasWarning: boolean;
+  slotPlayers: SlotPlayers;
+  warnStarter: boolean;
+  warnBackup: boolean;
   x: number;
   y: number;
 }) {
-  const { isOver, setNodeRef: setDropRef } = useDroppable({ id: `slot:${slotKey}` });
-  const dragData: DragData | undefined = player
-    ? { type: "player", player, fromSlot: slotKey }
+  // ── Starter droppable + draggable ──
+  const { isOver: isOverS, setNodeRef: setDropS } = useDroppable({ id: `drop-s:${slotKey}` });
+  const starterDragData: DragData | undefined = slotPlayers.starter
+    ? { type: "player", player: slotPlayers.starter, fromSlotKey: slotKey, fromSlotRole: "starter" }
     : undefined;
-  const { attributes, listeners, setNodeRef: setDragRef, transform, isDragging } = useDraggable({
-    id: `slot-player:${slotKey}`,
-    data: dragData,
-    disabled: !player,
-  });
-  const style = transform ? { transform: CSS.Translate.toString(transform) } : undefined;
+  const { attributes: attrsS, listeners: lisS, setNodeRef: setDragS, transform: transS, isDragging: isDragS } =
+    useDraggable({ id: `slot-s:${slotKey}`, data: starterDragData, disabled: !slotPlayers.starter });
+  const setRefS = (el: HTMLElement | null) => { setDropS(el); setDragS(el); };
 
-  const setRef = (el: HTMLElement | null) => {
-    setDropRef(el);
-    setDragRef(el);
-  };
+  // ── Backup droppable + draggable ──
+  const { isOver: isOverB, setNodeRef: setDropB } = useDroppable({ id: `drop-b:${slotKey}` });
+  const backupDragData: DragData | undefined = slotPlayers.backup
+    ? { type: "player", player: slotPlayers.backup, fromSlotKey: slotKey, fromSlotRole: "backup" }
+    : undefined;
+  const { attributes: attrsB, listeners: lisB, setNodeRef: setDragB, transform: transB, isDragging: isDragB } =
+    useDraggable({ id: `slot-b:${slotKey}`, data: backupDragData, disabled: !slotPlayers.backup });
+  const setRefB = (el: HTMLElement | null) => { setDropB(el); setDragB(el); };
 
   return (
     <div
-      ref={setRef}
-      style={{ left: `${x}%`, top: `${y}%`, ...style }}
-      {...(player ? { ...listeners, ...attributes } : {})}
-      className={cn(
-        "absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-0.5 cursor-default select-none z-10",
-        player ? "cursor-grab active:cursor-grabbing" : ""
-      )}
+      style={{ left: `${x}%`, top: `${y}%` }}
+      className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-[2px] select-none z-10"
     >
+      {/* Starter circle */}
       <div
+        ref={setRefS}
+        style={transS ? { transform: CSS.Translate.toString(transS) } : undefined}
+        {...(slotPlayers.starter ? { ...lisS, ...attrsS } : {})}
         className={cn(
-          "flex h-10 w-10 items-center justify-center rounded-full border-2 text-xs font-bold transition-all",
-          isOver
-            ? "border-blue-400 bg-blue-100 scale-110"
-            : player
-            ? "border-blue-500 bg-blue-500 text-white shadow-md"
-            : "border-dashed border-white/70 bg-white/20 text-white",
-          isDragging ? "opacity-40" : ""
+          "flex h-9 w-9 items-center justify-center rounded-full border-2 transition-all",
+          isOverS
+            ? "border-blue-300 bg-blue-200 scale-110"
+            : slotPlayers.starter
+            ? "border-blue-500 bg-blue-500 text-white shadow-md cursor-grab active:cursor-grabbing"
+            : "border-dashed border-white/60 bg-white/20 text-white/80",
+          isDragS ? "opacity-40" : ""
         )}
       >
-        {player ? (
-          <span className="text-[10px] font-semibold leading-tight text-center px-0.5 truncate max-w-[36px]">
-            {player.last_name.slice(0, 5)}
+        {slotPlayers.starter ? (
+          <span className="text-[9px] font-bold leading-tight text-center truncate max-w-[32px] px-0.5">
+            {slotPlayers.starter.last_name.slice(0, 5)}
           </span>
         ) : (
-          label
+          <span className="text-[9px] text-white/70">{label}</span>
         )}
       </div>
-      {hasWarning && <AlertTriangle className="h-3 w-3 text-amber-400 drop-shadow" />}
-      <span className="text-[10px] text-white/90 font-medium drop-shadow">{label}</span>
+
+      {/* Starter warning badge */}
+      {warnStarter && !isDragS && (
+        <AlertTriangle className="h-2.5 w-2.5 text-amber-400 -mt-0.5" />
+      )}
+
+      {/* Backup pill */}
+      <div
+        ref={setRefB}
+        style={transB ? { transform: CSS.Translate.toString(transB) } : undefined}
+        {...(slotPlayers.backup ? { ...lisB, ...attrsB } : {})}
+        className={cn(
+          "flex min-w-[40px] items-center justify-center gap-0.5 rounded px-1 py-0.5 border text-[8px] transition-all",
+          isOverB
+            ? "border-amber-300 bg-amber-100 text-amber-800 scale-105"
+            : slotPlayers.backup
+            ? "border-amber-400 bg-amber-100 text-amber-800 cursor-grab active:cursor-grabbing shadow-sm"
+            : "border-dashed border-white/30 bg-white/10 text-white/40",
+          isDragB ? "opacity-40" : ""
+        )}
+      >
+        {slotPlayers.backup ? (
+          <>
+            {warnBackup && <AlertTriangle className="h-2 w-2 text-amber-500 shrink-0" />}
+            <span className="font-medium truncate max-w-[34px]">
+              {slotPlayers.backup.last_name.slice(0, 5)}
+            </span>
+          </>
+        ) : (
+          <span className="italic">bkup</span>
+        )}
+      </div>
+
+      {/* Position label */}
+      <span className="text-[9px] text-white/80 font-medium drop-shadow mt-0.5">{label}</span>
     </div>
   );
 }
@@ -423,43 +468,43 @@ function SoccerField({
   warningPlayerIds,
 }: {
   formation: FormationKey;
-  slots: Record<string, Player | null>;
+  slots: LineupSlots;
   warningPlayerIds: Set<string>;
 }) {
   const slotDefs = FORMATIONS[formation];
 
   return (
-    <div className="relative w-full rounded-xl overflow-hidden border-2 border-green-700"
-      style={{ paddingBottom: "140%", background: "linear-gradient(180deg, #2d7a3a 0%, #3a9e4d 50%, #2d7a3a 100%)" }}
+    <div
+      className="relative w-full rounded-xl overflow-hidden border-2 border-green-700"
+      style={{ paddingBottom: "155%", background: "linear-gradient(180deg, #2d7a3a 0%, #3a9e4d 50%, #2d7a3a 100%)" }}
     >
       {/* Field markings */}
       <div className="absolute inset-0">
-        {/* Centre circle */}
         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-[18%] w-[40%] rounded-full border border-white/30" />
-        {/* Centre line */}
         <div className="absolute left-0 right-0 top-1/2 h-px bg-white/30" />
-        {/* Top penalty box */}
         <div className="absolute left-[20%] right-[20%] top-0 h-[22%] border border-white/30 border-t-0" />
-        {/* Bottom penalty box */}
         <div className="absolute left-[20%] right-[20%] bottom-0 h-[22%] border border-white/30 border-b-0" />
-        {/* Goals */}
         <div className="absolute left-[37%] right-[37%] top-0 h-[3%] border border-white/40 border-t-0 bg-white/10" />
         <div className="absolute left-[37%] right-[37%] bottom-0 h-[3%] border border-white/40 border-b-0 bg-white/10" />
       </div>
 
       {/* Formation slots */}
       <div className="absolute inset-0">
-        {slotDefs.map((slotDef) => (
-          <FormationSlotDot
-            key={slotDef.key}
-            slotKey={slotDef.key}
-            label={slotDef.label}
-            player={slots[slotDef.key] ?? null}
-            hasWarning={!!slots[slotDef.key] && warningPlayerIds.has(slots[slotDef.key]!.id)}
-            x={slotDef.x}
-            y={slotDef.y}
-          />
-        ))}
+        {slotDefs.map((slotDef) => {
+          const sp = slots[slotDef.key] ?? { starter: null, backup: null };
+          return (
+            <FormationSlotDot
+              key={slotDef.key}
+              slotKey={slotDef.key}
+              label={slotDef.label}
+              slotPlayers={sp}
+              warnStarter={!!sp.starter && warningPlayerIds.has(sp.starter.id)}
+              warnBackup={!!sp.backup && warningPlayerIds.has(sp.backup.id)}
+              x={slotDef.x}
+              y={slotDef.y}
+            />
+          );
+        })}
       </div>
     </div>
   );
@@ -489,7 +534,7 @@ function BenchArea({ players, warningPlayerIds }: { players: Player[]; warningPl
             key={p.id}
             player={p}
             hasWarning={warningPlayerIds.has(p.id)}
-            dragData={{ type: "player", player: p, fromSlot: "bench" }}
+            dragData={{ type: "player", player: p, fromBench: true }}
             compact
           />
         ))}
@@ -531,9 +576,10 @@ export function LineupBuilderClient({ initialTeams, initialUnassigned }: LineupB
 
   // ── Lineup builder state ───────────────────────────────────────────────────
   const firstTeamId = initialTeams[0]?.id ?? null;
+  const [gameFormat, setGameFormat] = useState<GameFormat>("11v11");
   const [selectedLineupTeamId, setSelectedLineupTeamId] = useState<string | null>(firstTeamId);
   const [lineupState, setLineupState] = useState<LineupState>(() => ({
-    formation: "4-3-3",
+    formation: FORMAT_FORMATIONS["11v11"][0],
     slots: {},
     bench: initialTeams[0]?.players ?? [],
   }));
@@ -546,16 +592,33 @@ export function LineupBuilderClient({ initialTeams, initialUnassigned }: LineupB
   const handleLineupTeamChange = useCallback((teamId: string) => {
     setSelectedLineupTeamId(teamId);
     const team = initialTeams.find((t) => t.id === teamId);
-    setLineupState({ formation: "4-3-3", slots: {}, bench: team?.players ?? [] });
+    setLineupState({ formation: FORMAT_FORMATIONS[gameFormat][0], slots: {}, bench: team?.players ?? [] });
     setLineupSaveError(null);
     setLineupSaveSuccess(false);
-  }, [initialTeams]);
+  }, [initialTeams, gameFormat]);
 
-  // Change formation (clears slots)
+  // Change game format — resets formation + clears all slots
+  const handleGameFormatChange = useCallback((gf: GameFormat) => {
+    const newFormation = FORMAT_FORMATIONS[gf][0];
+    setGameFormat(gf);
+    setLineupState((prev) => {
+      const placed: Player[] = [];
+      for (const sp of Object.values(prev.slots)) {
+        if (sp.starter) placed.push(sp.starter);
+        if (sp.backup) placed.push(sp.backup);
+      }
+      return { formation: newFormation, slots: {}, bench: [...prev.bench, ...placed] };
+    });
+  }, []);
+
+  // Change formation within same format — clears slots
   const handleFormationChange = useCallback((f: FormationKey) => {
     setLineupState((prev) => {
-      // move all placed players back to bench
-      const placed = Object.values(prev.slots).filter(Boolean) as Player[];
+      const placed: Player[] = [];
+      for (const sp of Object.values(prev.slots)) {
+        if (sp.starter) placed.push(sp.starter);
+        if (sp.backup) placed.push(sp.backup);
+      }
       return { formation: f, slots: {}, bench: [...prev.bench, ...placed] };
     });
   }, []);
@@ -605,38 +668,40 @@ export function LineupBuilderClient({ initialTeams, initialUnassigned }: LineupB
     if (!data?.player) return;
 
     const player = data.player;
-    const fromSlot = data.fromSlot; // "bench" | slotKey
     const toId = String(over.id);
 
     setLineupState((prev) => {
-      const newSlots = { ...prev.slots };
+      const newSlots: LineupSlots = {};
+      for (const [k, v] of Object.entries(prev.slots)) newSlots[k] = { ...v };
       let newBench = [...prev.bench];
 
-      // Remove from source
-      if (fromSlot && fromSlot !== "bench") {
-        newSlots[fromSlot] = null;
-      } else if (fromSlot === "bench") {
+      // ── Remove from source ──
+      if (data.fromBench) {
         newBench = newBench.filter((p) => p.id !== player.id);
+      } else if (data.fromSlotKey && data.fromSlotRole) {
+        const cur = newSlots[data.fromSlotKey] ?? { starter: null, backup: null };
+        newSlots[data.fromSlotKey] = { ...cur, [data.fromSlotRole]: null };
       }
 
-      if (toId.startsWith("slot:")) {
-        const slotKey = toId.replace("slot:", "");
-        const displaced = newSlots[slotKey];
-
-        // If same slot, no-op
-        if (displaced?.id === player.id) {
-          // re-add to bench if we wrongly removed
-          return prev;
-        }
-
-        // Displace existing player to bench
-        if (displaced) {
-          newBench = [...newBench, displaced];
-        }
-        newSlots[slotKey] = player;
-      } else if (toId === "bench") {
-        // Dropped back to bench — already removed from slot above
+      // ── Add to destination ──
+      if (toId === "bench") {
+        // Already removed from slot above; push to bench
         newBench = [...newBench, player];
+      } else if (toId.startsWith("drop-s:")) {
+        const slotKey = toId.replace("drop-s:", "");
+        const cur = newSlots[slotKey] ?? { starter: null, backup: null };
+        const displaced = cur.starter;
+        newSlots[slotKey] = { ...cur, starter: player };
+        if (displaced && displaced.id !== player.id) newBench = [...newBench, displaced];
+      } else if (toId.startsWith("drop-b:")) {
+        const slotKey = toId.replace("drop-b:", "");
+        const cur = newSlots[slotKey] ?? { starter: null, backup: null };
+        const displaced = cur.backup;
+        newSlots[slotKey] = { ...cur, backup: player };
+        if (displaced && displaced.id !== player.id) newBench = [...newBench, displaced];
+      } else {
+        // Over an unknown target — undo the source removal by returning prev
+        return prev;
       }
 
       return { ...prev, slots: newSlots, bench: newBench };
@@ -656,6 +721,8 @@ export function LineupBuilderClient({ initialTeams, initialUnassigned }: LineupB
     return computeLineupWarnings(lineupTeam, lineupState.slots, lineupState.formation);
   }, [lineupTeam, lineupState.slots, lineupState.formation]);
   const lineupWarnIds = useMemo(() => new Set(lineupWarnings.map((w) => w.playerId)), [lineupWarnings]);
+  const starterCount = Object.values(lineupState.slots).filter((sp) => sp.starter).length;
+  const slotCount = FORMATIONS[lineupState.formation]?.length ?? 0;
 
   // ── Compute sandbox diffs (for Save) ─────────────────────────────────────────
   const sandboxMoves = useMemo(() => {
@@ -719,9 +786,9 @@ export function LineupBuilderClient({ initialTeams, initialUnassigned }: LineupB
     setLineupSaveError(null);
     setLineupSaveSuccess(false);
     try {
-      const slots: Record<string, string | null> = {};
+      const slotsPayload: Record<string, { starter: string | null; backup: string | null }> = {};
       for (const [k, v] of Object.entries(lineupState.slots)) {
-        slots[k] = v?.id ?? null;
+        slotsPayload[k] = { starter: v.starter?.id ?? null, backup: v.backup?.id ?? null };
       }
       const res = await fetch("/api/app/lineup", {
         method: "POST",
@@ -729,7 +796,7 @@ export function LineupBuilderClient({ initialTeams, initialUnassigned }: LineupB
         body: JSON.stringify({
           team_id: selectedLineupTeamId,
           formation: lineupState.formation,
-          slots,
+          slots: slotsPayload,
         }),
       });
       if (!res.ok) {
@@ -892,6 +959,23 @@ export function LineupBuilderClient({ initialTeams, initialUnassigned }: LineupB
                 </SelectContent>
               </Select>
 
+              {/* Game format picker */}
+              <Select
+                value={gameFormat}
+                onValueChange={(v) => handleGameFormatChange(v as GameFormat)}
+              >
+                <SelectTrigger className="w-[120px] h-8 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {GAME_FORMATS.map((gf) => (
+                    <SelectItem key={gf} value={gf}>
+                      {GAME_FORMAT_LABELS[gf]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
               {/* Formation picker */}
               <Select
                 value={lineupState.formation}
@@ -901,15 +985,19 @@ export function LineupBuilderClient({ initialTeams, initialUnassigned }: LineupB
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {FORMATION_KEYS.map((f) => (
+                  {FORMAT_FORMATIONS[gameFormat].map((f) => (
                     <SelectItem key={f} value={f}>
-                      {f}
+                      {getFormationLabel(f)}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
 
               <div className="flex-1" />
+
+              <span className="text-xs text-gray-500 tabular-nums">
+                {starterCount}/{slotCount} starters placed
+              </span>
 
               {lineupSaveError && <span className="text-xs text-red-600">{lineupSaveError}</span>}
               {lineupSaveSuccess && <span className="text-xs text-green-600">Lineup saved!</span>}
