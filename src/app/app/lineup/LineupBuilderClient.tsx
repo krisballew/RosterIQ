@@ -405,6 +405,7 @@ function FormationSlotDot({
         ref={setRefS}
         style={transS ? { transform: CSS.Translate.toString(transS) } : undefined}
         {...(slotPlayers.starter ? { ...lisS, ...attrsS } : {})}
+        title={slotPlayers.starter ? `${slotPlayers.starter.first_name} ${slotPlayers.starter.last_name}` : label}
         className={cn(
           "flex h-9 w-9 items-center justify-center rounded-full border-2 transition-all",
           isOverS
@@ -434,6 +435,7 @@ function FormationSlotDot({
         ref={setRefB}
         style={transB ? { transform: CSS.Translate.toString(transB) } : undefined}
         {...(slotPlayers.backup ? { ...lisB, ...attrsB } : {})}
+        title={slotPlayers.backup ? `${slotPlayers.backup.first_name} ${slotPlayers.backup.last_name} (backup)` : "backup"}
         className={cn(
           "flex min-w-[40px] items-center justify-center gap-0.5 rounded px-1 py-0.5 border text-[8px] transition-all",
           isOverB
@@ -476,7 +478,7 @@ function SoccerField({
   return (
     <div
       className="relative w-full rounded-xl overflow-hidden border-2 border-green-700"
-      style={{ paddingBottom: "155%", background: "linear-gradient(180deg, #2d7a3a 0%, #3a9e4d 50%, #2d7a3a 100%)" }}
+      style={{ paddingBottom: "116%", background: "linear-gradient(180deg, #2d7a3a 0%, #3a9e4d 50%, #2d7a3a 100%)" }}
     >
       {/* Field markings */}
       <div className="absolute inset-0">
