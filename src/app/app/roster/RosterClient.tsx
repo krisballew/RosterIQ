@@ -488,14 +488,17 @@ function mapTeamsnapRow(row: Record<string, string>): ImportedPlayer | null {
   const team = pickField(row, "Team", "Team Name", "Team Assigned");
   const div = pickField(row, "Age Division", "Age Group", "Division", "Age Level");
 
-  // Primary parent email: prefer contact columns, fall back to player email
+  // Primary parent email: TeamSnap typically uses "Contact 1 Email Address"
   const email1 = pickField(row,
-    "Contact #1 Email", "Contact 1 Email", "Contact Email", "Contact Email Address",
+    "Contact 1 Email Address", "Contact #1 Email Address",
+    "Contact #1 Email", "Contact 1 Email",
+    "Contact Email Address", "Contact Email",
     "Parent Email", "Guardian Email", "Email Address", "Email"
   );
   const email2 = pickField(row,
-    "Contact #2 Email", "Contact 2 Email", "Secondary Email",
-    "Secondary Contact Email", "Secondary Parent Email"
+    "Contact 2 Email Address", "Contact #2 Email Address",
+    "Contact #2 Email", "Contact 2 Email",
+    "Secondary Email", "Secondary Contact Email", "Secondary Parent Email"
   );
 
   const posRaw = pickField(row, "Position", "Positions", "Preferred Position");
@@ -530,7 +533,8 @@ function ImportPlayersDialog({
   const [parseError, setParseError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState<{ inserted: number; skipped: number; skippedNames: string[]; errors: string[] } | null>(null);
-  const [defaultTeam, setDefaultTeam] = useState("");
+  // "__keep__" = use CSV value, "__unassigned__" = clear, anything else = team name
+  const [defaultTeam, setDefaultTeam] = useState<string>("__keep__");
   const [dragOver, setDragOver] = useState(false);
 
   const reset = () => {
@@ -538,7 +542,7 @@ function ImportPlayersDialog({
     setParsed([]);
     setParseError(null);
     setResult(null);
-    setDefaultTeam("");
+    setDefaultTeam("__keep__");
   };
 
   const handleOpenChange = (v: boolean) => {
@@ -569,12 +573,19 @@ function ImportPlayersDialog({
     if (file) handleFile(file);
   };
 
+  // Resolve effective team for a player given the current override
+  const resolveTeam = (p: ImportedPlayer): string | null => {
+    if (defaultTeam === "__keep__") return p.team_assigned;
+    if (defaultTeam === "__unassigned__") return null;
+    return defaultTeam;
+  };
+
   const handleImport = async () => {
     setImporting(true);
     try {
       const payload = parsed.map((p) => ({
         ...p,
-        team_assigned: p.team_assigned || defaultTeam || null,
+        team_assigned: resolveTeam(p),
         status: "active" as const,
       }));
       const res = await fetch("/api/app/players/import", {
@@ -586,7 +597,6 @@ function ImportPlayersDialog({
       if (!res.ok) throw new Error(json.error ?? "Import failed");
       setResult(json);
       setStep("done");
-      // Refresh player list by re-fetching
       const reloadRes = await fetch("/api/app/players");
       if (reloadRes.ok) {
         const data = await reloadRes.json();
@@ -615,6 +625,26 @@ function ImportPlayersDialog({
           {/* ── Step 1: Upload ── */}
           {step === "upload" && (
             <div className="py-4 space-y-4">
+              {/* Team assignment — shown up front so it's set before preview */}
+              <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 space-y-3">
+                <div>
+                  <p className="text-sm font-medium text-gray-800">Assign imported players to a team</p>
+                  <p className="text-xs text-gray-500 mt-0.5">You can keep the team name from the CSV or assign everyone to one of your teams.</p>
+                </div>
+                <Select value={defaultTeam} onValueChange={setDefaultTeam}>
+                  <SelectTrigger className="w-72 h-9 text-sm bg-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__keep__">Keep team name from CSV</SelectItem>
+                    <SelectItem value="__unassigned__">— Leave unassigned —</SelectItem>
+                    {teams.map((t) => (
+                      <SelectItem key={t.id} value={t.name}>{t.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
               <div
                 className={`relative flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed p-10 transition-colors cursor-pointer ${dragOver ? "border-blue-400 bg-blue-50" : "border-gray-300 bg-gray-50 hover:border-gray-400"}`}
                 onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
@@ -657,33 +687,31 @@ function ImportPlayersDialog({
             <div className="py-4 space-y-4">
               <div className="flex items-center justify-between">
                 <p className="text-sm text-gray-700">
-                  Found <strong>{parsed.length}</strong> player{parsed.length !== 1 ? "s" : ""} in the CSV. Review and confirm below.
+                  Found <strong>{parsed.length}</strong> player{parsed.length !== 1 ? "s" : ""}. Review before importing.
                 </p>
                 <Button variant="ghost" size="sm" onClick={reset}>Start over</Button>
               </div>
 
-              {/* Optional default team override */}
-              {teams.length > 0 && (
-                <div className="flex items-center gap-3">
-                  <Label className="text-sm shrink-0">Override team assignment:</Label>
-                  <Select value={defaultTeam || "__keep__"} onValueChange={(v) => setDefaultTeam(v === "__keep__" ? "" : v)}>
-                    <SelectTrigger className="w-56 h-8 text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__keep__">Keep CSV value</SelectItem>
-                      <SelectItem value="">— Unassigned —</SelectItem>
-                      {teams.map((t) => (
-                        <SelectItem key={t.id} value={t.name}>{t.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
+              {/* Team override — also editable on preview step */}
+              <div className="flex items-center gap-3">
+                <Label className="text-sm shrink-0 text-gray-700">Team assignment:</Label>
+                <Select value={defaultTeam} onValueChange={setDefaultTeam}>
+                  <SelectTrigger className="w-56 h-8 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__keep__">Keep CSV value</SelectItem>
+                    <SelectItem value="__unassigned__">— Leave unassigned —</SelectItem>
+                    {teams.map((t) => (
+                      <SelectItem key={t.id} value={t.name}>{t.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-              <div className="rounded-xl border border-gray-200 overflow-auto max-h-80">
+              <div className="rounded-xl border border-gray-200 overflow-auto max-h-72">
                 <table className="min-w-full text-xs divide-y divide-gray-100">
-                  <thead className="bg-gray-50 text-gray-500 uppercase tracking-wider font-semibold">
+                  <thead className="bg-gray-50 text-gray-500 uppercase tracking-wider font-semibold sticky top-0">
                     <tr>
                       <th className="px-3 py-2 text-left">#</th>
                       <th className="px-3 py-2 text-left">First</th>
@@ -700,10 +728,10 @@ function ImportPlayersDialog({
                         <td className="px-3 py-1.5 text-gray-400">{i + 1}</td>
                         <td className="px-3 py-1.5 text-gray-900">{p.first_name}</td>
                         <td className="px-3 py-1.5 text-gray-900">{p.last_name}</td>
-                        <td className="px-3 py-1.5 text-gray-600">{p.date_of_birth ?? <span className="text-gray-300">—</span>}</td>
-                        <td className="px-3 py-1.5 text-gray-600">{(defaultTeam || p.team_assigned) ?? <span className="text-gray-300">—</span>}</td>
-                        <td className="px-3 py-1.5 text-gray-600 max-w-[160px] truncate">{p.primary_parent_email ?? <span className="text-gray-300">—</span>}</td>
-                        <td className="px-3 py-1.5 text-gray-600">{p.positions.join(", ") || <span className="text-gray-300">—</span>}</td>
+                        <td className="px-3 py-1.5 text-gray-600">{p.date_of_birth || "—"}</td>
+                        <td className="px-3 py-1.5 text-gray-600">{resolveTeam(p) || "—"}</td>
+                        <td className="px-3 py-1.5 text-gray-600 max-w-[160px] truncate">{p.primary_parent_email || "—"}</td>
+                        <td className="px-3 py-1.5 text-gray-600">{p.positions.join(", ") || "—"}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -1216,19 +1244,19 @@ export function RosterClient({ initialPlayers, initialTeams }: RosterClientProps
                         {player.first_name} {player.last_name}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-gray-600">
-                        {player.team_assigned || <span className="text-gray-300">—</span>}
+                        {player.team_assigned || "—"}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-gray-600">
-                        {player.age_division || <span className="text-gray-300">—</span>}
+                        {player.age_division || "—"}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-gray-600">
                         {formatDob(player.date_of_birth)}
                       </td>
                       <td className="px-4 py-3 text-gray-600 max-w-[180px] truncate">
-                        {player.primary_parent_email || <span className="text-gray-300">—</span>}
+                        {player.primary_parent_email || "—"}
                       </td>
                       <td className="px-4 py-3 text-gray-600 max-w-[180px] truncate">
-                        {player.secondary_parent_email || <span className="text-gray-300">—</span>}
+                        {player.secondary_parent_email || "—"}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3">
                         <Badge variant="outline" className={sc.className}>
@@ -1366,8 +1394,8 @@ export function RosterClient({ initialPlayers, initialTeams }: RosterClientProps
                   {teams.map((t) => (
                     <tr key={t.id} className="hover:bg-gray-50/60">
                       <td className="px-4 py-2 font-medium text-gray-900">{t.name}</td>
-                      <td className="px-4 py-2 text-gray-600">{t.age_division ?? <span className="text-gray-300">—</span>}</td>
-                      <td className="px-4 py-2 text-gray-600">{t.birth_year ?? <span className="text-gray-300">—</span>}</td>
+                      <td className="px-4 py-2 text-gray-600">{t.age_division ?? "—"}</td>
+                      <td className="px-4 py-2 text-gray-600">{t.birth_year ?? "—"}</td>
                       <td className="px-4 py-2 text-gray-600">{t.roster_limit}</td>
                       <td className="px-4 py-2 text-right">
                         <div className="inline-flex gap-1">
