@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 export const runtime = "nodejs";
 
 // GET /api/app/lineup?team_id=<id>
-// Returns the saved lineup for a team (if any).
+// Returns all saved lineups for a team, ordered newest-first.
 export async function GET(request: NextRequest) {
   const supabase = await createClient();
   const {
@@ -35,16 +35,16 @@ export async function GET(request: NextRequest) {
 
   const { data, error } = await supabase
     .from("lineups")
-    .select("*")
+    .select("id, name, formation, slots, notes, updated_at")
     .eq("tenant_id", membership.tenant_id)
     .eq("team_id", teamId)
-    .maybeSingle();
+    .order("updated_at", { ascending: false });
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ lineup: data ?? null });
+  return NextResponse.json({ lineups: data ?? [] });
 }
 
 // POST /api/app/lineup
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { team_id, formation, slots } = body;
+  const { team_id, formation, slots, name, notes } = body;
 
   if (!team_id || !formation) {
     return NextResponse.json({ error: "team_id and formation are required" }, { status: 400 });
@@ -107,15 +107,14 @@ export async function POST(request: NextRequest) {
 
   const { data, error } = await supabase
     .from("lineups")
-    .upsert(
-      {
-        tenant_id: membership.tenant_id,
-        team_id,
-        formation,
-        slots: slots ?? {},
-      },
-      { onConflict: "team_id" }
-    )
+    .insert({
+      tenant_id: membership.tenant_id,
+      team_id,
+      formation,
+      slots: slots ?? {},
+      name: (name as string | undefined)?.trim() || "Untitled Lineup",
+      notes: (notes as string | undefined) ?? null,
+    })
     .select()
     .single();
 

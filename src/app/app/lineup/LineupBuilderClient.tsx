@@ -1,6 +1,6 @@
 "use client";
 
-import { useReducer, useCallback, useState, useMemo } from "react";
+import { useReducer, useCallback, useState, useMemo, useEffect } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -24,6 +24,8 @@ import {
   Users,
   Layers,
   GripVertical,
+  FolderOpen,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -34,6 +36,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import {
   FORMATIONS,
@@ -549,6 +560,179 @@ function BenchArea({ players, warningPlayerIds }: { players: Player[]; warningPl
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// SavedLineup type
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface SavedLineup {
+  id: string;
+  name: string;
+  formation: string;
+  slots: Record<string, { starter: string | null; backup: string | null }>;
+  notes: string | null;
+  updated_at: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Save Lineup Dialog
+// ─────────────────────────────────────────────────────────────────────────────
+
+function SaveLineupDialog({
+  open,
+  onClose,
+  initialName,
+  initialNotes,
+  isUpdating,
+  saving,
+  saveError,
+  onSave,
+}: {
+  open: boolean;
+  onClose: () => void;
+  initialName: string;
+  initialNotes: string;
+  isUpdating: boolean;
+  saving: boolean;
+  saveError: string | null;
+  onSave: (name: string, notes: string, saveAsNew: boolean) => void;
+}) {
+  const [name, setName] = useState(initialName);
+  const [notes, setNotes] = useState(initialNotes);
+
+  // Sync when dialog opens
+  useEffect(() => {
+    if (open) {
+      setName(initialName);
+      setNotes(initialNotes);
+    }
+  }, [open, initialName, initialNotes]);
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{isUpdating ? "Update Lineup" : "Save Lineup"}</DialogTitle>
+        </DialogHeader>
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="lineup-name">Name</Label>
+            <Input
+              id="lineup-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Home vs. Rivals"
+              disabled={saving}
+              autoFocus
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="lineup-notes-dialog">Notes</Label>
+            <textarea
+              id="lineup-notes-dialog"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Add any notes about this lineup…"
+              rows={4}
+              disabled={saving}
+              className="flex min-h-[80px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 resize-none"
+            />
+          </div>
+          {saveError && <p className="text-xs text-red-600">{saveError}</p>}
+        </div>
+        <DialogFooter className="flex-col sm:flex-row gap-2">
+          {isUpdating && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onSave(name, notes, true)}
+              disabled={saving || !name.trim()}
+            >
+              Save as New
+            </Button>
+          )}
+          <Button
+            size="sm"
+            onClick={() => onSave(name, notes, false)}
+            disabled={saving || !name.trim()}
+          >
+            {saving ? "Saving…" : isUpdating ? "Update" : "Save"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Load Lineup Dialog
+// ─────────────────────────────────────────────────────────────────────────────
+
+function LoadLineupDialog({
+  open,
+  onClose,
+  lineups,
+  loading,
+  currentId,
+  onLoad,
+  onDelete,
+}: {
+  open: boolean;
+  onClose: () => void;
+  lineups: SavedLineup[];
+  loading: boolean;
+  currentId: string | null;
+  onLoad: (lineup: SavedLineup) => void;
+  onDelete: (id: string) => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Load Lineup</DialogTitle>
+        </DialogHeader>
+        {loading ? (
+          <p className="text-sm text-gray-500 py-4 text-center">Loading…</p>
+        ) : lineups.length === 0 ? (
+          <p className="text-sm text-gray-500 py-4 text-center">
+            No saved lineups for this team yet.
+          </p>
+        ) : (
+          <div className="flex flex-col gap-2 max-h-[400px] overflow-y-auto pr-1">
+            {lineups.map((l) => (
+              <div
+                key={l.id}
+                className={cn(
+                  "flex items-start gap-3 rounded-lg border p-3",
+                  currentId === l.id
+                    ? "border-primary bg-primary/5"
+                    : "hover:bg-gray-50 cursor-pointer"
+                )}
+              >
+                <div className="flex-1 min-w-0" onClick={() => onLoad(l)}>
+                  <p className="font-medium text-sm truncate">{l.name}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {l.formation} · Updated {new Date(l.updated_at).toLocaleDateString()}
+                  </p>
+                  {l.notes && (
+                    <p className="text-xs text-gray-400 mt-1 line-clamp-2">{l.notes}</p>
+                  )}
+                </div>
+                <button
+                  onClick={() => onDelete(l.id)}
+                  className="shrink-0 p-1 rounded text-gray-400 hover:text-red-500 hover:bg-red-50"
+                  title="Delete lineup"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Main Client Component
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -590,6 +774,15 @@ export function LineupBuilderClient({ initialTeams, initialUnassigned }: LineupB
   const [lineupSaveError, setLineupSaveError] = useState<string | null>(null);
   const [lineupSaveSuccess, setLineupSaveSuccess] = useState(false);
 
+  // Named lineups
+  const [lineupName, setLineupName] = useState("Untitled Lineup");
+  const [lineupNotes, setLineupNotes] = useState("");
+  const [currentLineupId, setCurrentLineupId] = useState<string | null>(null);
+  const [savedLineups, setSavedLineups] = useState<SavedLineup[]>([]);
+  const [loadingLineups, setLoadingLineups] = useState(false);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [showLoadDialog, setShowLoadDialog] = useState(false);
+
   // Change selected lineup team
   const handleLineupTeamChange = useCallback((teamId: string) => {
     setSelectedLineupTeamId(teamId);
@@ -597,6 +790,11 @@ export function LineupBuilderClient({ initialTeams, initialUnassigned }: LineupB
     setLineupState({ formation: FORMAT_FORMATIONS[gameFormat][0], slots: {}, bench: team?.players ?? [] });
     setLineupSaveError(null);
     setLineupSaveSuccess(false);
+    // Reset named lineup state
+    setCurrentLineupId(null);
+    setLineupName("Untitled Lineup");
+    setLineupNotes("");
+    setSavedLineups([]);
   }, [initialTeams, gameFormat]);
 
   // Change game format — resets formation + clears all slots
@@ -781,8 +979,74 @@ export function LineupBuilderClient({ initialTeams, initialUnassigned }: LineupB
     }
   }, [hasSandboxChanges, sandboxMoves]);
 
+  // ── Fetch saved lineups ───────────────────────────────────────────────────────
+  const fetchSavedLineups = useCallback(async (teamId: string) => {
+    setLoadingLineups(true);
+    try {
+      const res = await fetch(`/api/app/lineup?team_id=${teamId}`);
+      if (res.ok) {
+        const j = await res.json();
+        setSavedLineups(j.lineups ?? []);
+      }
+    } finally {
+      setLoadingLineups(false);
+    }
+  }, []);
+
+  // Auto-fetch saved lineups when switching to lineup tab or changing team
+  useEffect(() => {
+    if (tab === "lineup" && selectedLineupTeamId && !String(selectedLineupTeamId).startsWith("virtual:")) {
+      void fetchSavedLineups(selectedLineupTeamId);
+    }
+  }, [tab, selectedLineupTeamId, fetchSavedLineups]);
+
+  // ── Load a saved lineup into the builder ─────────────────────────────────────
+  const handleLoadLineup = useCallback((sl: SavedLineup) => {
+    const team = initialTeams.find((t) => t.id === selectedLineupTeamId);
+    if (!team) return;
+
+    const formationKey = sl.formation as FormationKey;
+    const detectedFormat = (
+      Object.entries(FORMAT_FORMATIONS) as [GameFormat, FormationKey[]][]
+    ).find(([, formations]) => formations.includes(formationKey))?.[0] ?? gameFormat;
+
+    const playerMap = new Map(team.players.map((p) => [p.id, p]));
+    const newSlots: LineupSlots = {};
+    for (const [key, val] of Object.entries(sl.slots)) {
+      newSlots[key] = {
+        starter: val.starter ? (playerMap.get(val.starter) ?? null) : null,
+        backup: val.backup ? (playerMap.get(val.backup) ?? null) : null,
+      };
+    }
+
+    const slottedIds = new Set<string>();
+    for (const sp of Object.values(newSlots)) {
+      if (sp.starter) slottedIds.add(sp.starter.id);
+      if (sp.backup) slottedIds.add(sp.backup.id);
+    }
+    const newBench = team.players.filter((p) => !slottedIds.has(p.id));
+
+    setGameFormat(detectedFormat);
+    setLineupState({ formation: formationKey, slots: newSlots, bench: newBench });
+    setLineupName(sl.name);
+    setLineupNotes(sl.notes ?? "");
+    setCurrentLineupId(sl.id);
+    setShowLoadDialog(false);
+  }, [selectedLineupTeamId, initialTeams, gameFormat]);
+
+  // ── Delete a saved lineup ─────────────────────────────────────────────────────
+  const handleDeleteSavedLineup = useCallback(async (id: string) => {
+    await fetch(`/api/app/lineup/${id}`, { method: "DELETE" });
+    setSavedLineups((prev) => prev.filter((l) => l.id !== id));
+    if (currentLineupId === id) {
+      setCurrentLineupId(null);
+      setLineupName("Untitled Lineup");
+      setLineupNotes("");
+    }
+  }, [currentLineupId]);
+
   // ── Save lineup ───────────────────────────────────────────────────────────────
-  const handleSaveLineup = useCallback(async () => {
+  const handleSaveLineup = useCallback(async (nameArg: string, notesArg: string, saveAsNew: boolean) => {
     if (!selectedLineupTeamId) return;
     setLineupSaving(true);
     setLineupSaveError(null);
@@ -792,27 +1056,59 @@ export function LineupBuilderClient({ initialTeams, initialUnassigned }: LineupB
       for (const [k, v] of Object.entries(lineupState.slots)) {
         slotsPayload[k] = { starter: v.starter?.id ?? null, backup: v.backup?.id ?? null };
       }
-      const res = await fetch("/api/app/lineup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          team_id: selectedLineupTeamId,
-          formation: lineupState.formation,
-          slots: slotsPayload,
-        }),
-      });
+
+      let res: Response;
+      if (currentLineupId && !saveAsNew) {
+        // Update existing lineup
+        res = await fetch(`/api/app/lineup/${currentLineupId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: nameArg,
+            notes: notesArg,
+            formation: lineupState.formation,
+            slots: slotsPayload,
+          }),
+        });
+      } else {
+        // Create new lineup
+        res = await fetch("/api/app/lineup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            team_id: selectedLineupTeamId,
+            formation: lineupState.formation,
+            slots: slotsPayload,
+            name: nameArg,
+            notes: notesArg,
+          }),
+        });
+      }
+
       if (!res.ok) {
         const j = await res.json();
         throw new Error(j.error ?? "Save failed");
       }
+
+      const j = await res.json();
+      const saved = j.lineup as SavedLineup;
+      setCurrentLineupId(saved.id);
+      setLineupName(saved.name);
+      setLineupNotes(saved.notes ?? "");
+      setSavedLineups((prev) => {
+        const exists = prev.find((l) => l.id === saved.id);
+        if (exists) return prev.map((l) => (l.id === saved.id ? saved : l));
+        return [saved, ...prev];
+      });
       setLineupSaveSuccess(true);
+      setShowSaveDialog(false);
       setTimeout(() => setLineupSaveSuccess(false), 3000);
     } catch (e) {
       setLineupSaveError(e instanceof Error ? e.message : "Save failed");
     } finally {
       setLineupSaving(false);
     }
-  }, [selectedLineupTeamId, lineupState]);
+  }, [selectedLineupTeamId, lineupState, currentLineupId]);
 
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
@@ -1005,8 +1301,23 @@ export function LineupBuilderClient({ initialTeams, initialUnassigned }: LineupB
               {lineupSaveSuccess && <span className="text-xs text-green-600">Lineup saved!</span>}
 
               <Button
+                variant="outline"
                 size="sm"
-                onClick={handleSaveLineup}
+                onClick={() => {
+                  if (selectedLineupTeamId && !String(selectedLineupTeamId).startsWith("virtual:")) {
+                    void fetchSavedLineups(selectedLineupTeamId);
+                  }
+                  setShowLoadDialog(true);
+                }}
+                disabled={!selectedLineupTeamId || String(selectedLineupTeamId).startsWith("virtual:")}
+              >
+                <FolderOpen className="h-3.5 w-3.5 mr-1" />
+                Load
+              </Button>
+
+              <Button
+                size="sm"
+                onClick={() => setShowSaveDialog(true)}
                 disabled={!selectedLineupTeamId || lineupSaving || String(selectedLineupTeamId).startsWith("virtual:")}
                 title={String(selectedLineupTeamId).startsWith("virtual:") ? "Create this team in the DB before saving a lineup" : undefined}
               >
@@ -1029,7 +1340,7 @@ export function LineupBuilderClient({ initialTeams, initialUnassigned }: LineupB
               <WarningsPanel warnings={lineupWarnings} />
             </div>
 
-            {/* Field + bench */}
+            {/* Field + bench + notes */}
             {selectedLineupTeamId ? (
               <div className="flex gap-4 flex-1 overflow-auto">
                 {/* Field */}
@@ -1053,6 +1364,22 @@ export function LineupBuilderClient({ initialTeams, initialUnassigned }: LineupB
                   </p>
                   <BenchArea players={lineupState.bench} warningPlayerIds={lineupWarnIds} />
                 </div>
+
+                {/* Coach notes */}
+                <div className="flex-1 min-w-[180px] flex flex-col gap-1.5">
+                  <p className="text-xs font-medium text-gray-600">
+                    Coach Notes
+                    {currentLineupId && (
+                      <span className="ml-1.5 text-gray-400 font-normal">— {lineupName}</span>
+                    )}
+                  </p>
+                  <textarea
+                    value={lineupNotes}
+                    onChange={(e) => setLineupNotes(e.target.value)}
+                    placeholder="Add notes about this lineup…"
+                    className="flex-1 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none min-h-[120px]"
+                  />
+                </div>
               </div>
             ) : (
               <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">
@@ -1074,6 +1401,29 @@ export function LineupBuilderClient({ initialTeams, initialUnassigned }: LineupB
           </DragOverlay>
         </DndContext>
       )}
+
+      {/* Save lineup dialog */}
+      <SaveLineupDialog
+        open={showSaveDialog}
+        onClose={() => setShowSaveDialog(false)}
+        initialName={lineupName}
+        initialNotes={lineupNotes}
+        isUpdating={!!currentLineupId}
+        saving={lineupSaving}
+        saveError={lineupSaveError}
+        onSave={handleSaveLineup}
+      />
+
+      {/* Load lineup dialog */}
+      <LoadLineupDialog
+        open={showLoadDialog}
+        onClose={() => setShowLoadDialog(false)}
+        lineups={savedLineups}
+        loading={loadingLineups}
+        currentId={currentLineupId}
+        onLoad={handleLoadLineup}
+        onDelete={handleDeleteSavedLineup}
+      />
     </div>
   );
 }
