@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import {
   Plus,
   Search,
@@ -18,6 +18,8 @@ import {
   Upload,
   FileText,
   AlertCircle,
+  Calendar,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,6 +39,7 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
+  DialogClose,
 } from "@/components/ui/dialog";
 import {
   DropdownMenu,
@@ -804,6 +807,198 @@ function ImportPlayersDialog({
 }
 
 // ─────────────────────────────────────────────────────────────
+// Age Division utilities  (auto-rolls forward on Aug 1 each year)
+// ─────────────────────────────────────────────────────────────
+
+const AGE_GROUPS = [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
+
+/** Season "end year": before Aug 1 → current year; on/after Aug 1 → current year + 1 */
+function getSeasonEndYear(): number {
+  const now = new Date();
+  const aug1 = new Date(now.getFullYear(), 7, 1);
+  return now >= aug1 ? now.getFullYear() + 1 : now.getFullYear();
+}
+
+interface AgeDivisionRange {
+  division: string;
+  fromDate: Date;
+  toDate: Date;
+  fromStr: string;
+  toStr: string;
+}
+
+function computeAgeDivisions(seasonEndYear: number): AgeDivisionRange[] {
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  return AGE_GROUPS.map((age) => {
+    const fromYear = seasonEndYear - age;
+    const toYear = seasonEndYear - age + 1;
+    return {
+      division: `U${age}`,
+      fromDate: new Date(fromYear, 7, 1),
+      toDate: new Date(toYear, 6, 31, 23, 59, 59),
+      fromStr: `${months[7]} 1, ${fromYear}`,
+      toStr: `${months[6]} 31, ${toYear}`,
+    };
+  });
+}
+
+function computeDivisionForDob(dob: string, ranges: AgeDivisionRange[]): string | null {
+  const d = new Date(dob + "T00:00:00");
+  for (const r of ranges) {
+    if (d >= r.fromDate && d <= r.toDate) return r.division;
+  }
+  return null;
+}
+
+// ─────────────────────────────────────────────────────────────
+// Age Divisions Dialog
+// ─────────────────────────────────────────────────────────────
+
+interface AgeDivisionsDialogProps {
+  open: boolean;
+  onClose: () => void;
+  players: Player[];
+  onPlayersUpdated: (updated: Player[]) => void;
+}
+
+function AgeDivisionsDialog({ open, onClose, players, onPlayersUpdated }: AgeDivisionsDialogProps) {
+  const seasonEndYear = getSeasonEndYear();
+  const ranges = useMemo(() => computeAgeDivisions(seasonEndYear), [seasonEndYear]);
+
+  // Count players matching each division (preview)
+  const divisionCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    let noDate = 0;
+    let outOfRange = 0;
+    for (const p of players) {
+      if (!p.date_of_birth) { noDate++; continue; }
+      const div = computeDivisionForDob(p.date_of_birth, ranges);
+      if (div) counts[div] = (counts[div] ?? 0) + 1;
+      else outOfRange++;
+    }
+    return { counts, noDate, outOfRange };
+  }, [players, ranges]);
+
+  const [saving, setSaving] = useState(false);
+  const [result, setResult] = useState<{ updated: number; unmatched: number } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleAssign = useCallback(async () => {
+    setSaving(true);
+    setError(null);
+    setResult(null);
+    try {
+      const res = await fetch("/api/app/players/assign-age-divisions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ seasonEndYear }),
+      });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error ?? "Failed to assign age divisions");
+      setResult({ updated: j.updated, unmatched: j.unmatched });
+
+      // Update local player state from the known ranges (avoid full page reload)
+      onPlayersUpdated(
+        players.map((p) => {
+          if (!p.date_of_birth) return p;
+          const div = computeDivisionForDob(p.date_of_birth, ranges);
+          return div ? { ...p, age_division: div } : p;
+        })
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed");
+    } finally {
+      setSaving(false);
+    }
+  }, [seasonEndYear, players, ranges, onPlayersUpdated]);
+
+  // Reset result when dialog closes/opens
+  useEffect(() => {
+    if (!open) { setResult(null); setError(null); }
+  }, [open]);
+
+  const seasonLabel = `${seasonEndYear - 1}–${seasonEndYear}`;
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Age Division Rules</DialogTitle>
+          <DialogDescription>
+            Season {seasonLabel} · Ranges auto-roll forward on August 1st each year.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="overflow-hidden rounded-lg border border-gray-200">
+          <table className="min-w-full divide-y divide-gray-100 text-sm">
+            <thead className="bg-gray-50 text-xs uppercase tracking-wider text-gray-500 font-semibold">
+              <tr>
+                <th className="px-4 py-2.5 text-left">Division</th>
+                <th className="px-4 py-2.5 text-left">Birth Date Range</th>
+                <th className="px-4 py-2.5 text-right">Players (preview)</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100 bg-white">
+              {ranges.map((r) => (
+                <tr key={r.division} className="hover:bg-gray-50">
+                  <td className="px-4 py-2.5 font-semibold text-gray-800">{r.division}</td>
+                  <td className="px-4 py-2.5 text-gray-600">
+                    {r.fromStr} – {r.toStr}
+                  </td>
+                  <td className="px-4 py-2.5 text-right tabular-nums text-gray-700">
+                    {divisionCounts.counts[r.division] ?? 0}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="flex items-center gap-2 text-xs text-gray-500">
+          <Calendar className="h-3.5 w-3.5 shrink-0" />
+          <span>
+            {divisionCounts.noDate} player{divisionCounts.noDate !== 1 ? "s" : ""} without DOB (will be skipped)
+            {divisionCounts.outOfRange > 0 && ` · ${divisionCounts.outOfRange} outside U6–U19 range`}
+          </span>
+        </div>
+
+        {error && <p className="text-xs text-red-600">{error}</p>}
+
+        {result && (
+          <div className="rounded-md bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-800">
+            ✓ Updated {result.updated} player{result.updated !== 1 ? "s" : ""}.
+            {result.unmatched > 0 && ` ${result.unmatched} skipped (DOB outside range).`}
+          </div>
+        )}
+
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button variant="outline" size="sm">Close</Button>
+          </DialogClose>
+          <Button
+            size="sm"
+            onClick={handleAssign}
+            disabled={saving}
+          >
+            {saving ? (
+              <span className="flex items-center gap-1.5">
+                <span className="animate-spin h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full" />
+                Assigning…
+              </span>
+            ) : (
+              <span className="flex items-center gap-1.5">
+                <RefreshCw className="h-3.5 w-3.5" />
+                Auto-assign All Players
+              </span>
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
 // Main component
 // ─────────────────────────────────────────────────────────────
 
@@ -820,8 +1015,13 @@ export function RosterClient({ initialPlayers, initialTeams }: RosterClientProps
   const [teams, setTeams] = useState<Team[]>(initialTeams);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | PlayerStatus>("all");
+  // hide inactive by default; user can toggle
+  const [hideInactive, setHideInactive] = useState(true);
   // multi-select team filter — empty Set = show all
   const [selectedTeamNames, setSelectedTeamNames] = useState<Set<string>>(new Set());
+  // controlled team filter dropdown state (pending = not yet applied)
+  const [teamFilterOpen, setTeamFilterOpen] = useState(false);
+  const [pendingTeamNames, setPendingTeamNames] = useState<Set<string>>(new Set());
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
 
@@ -845,6 +1045,9 @@ export function RosterClient({ initialPlayers, initialTeams }: RosterClientProps
   // Import dialog
   const [importOpen, setImportOpen] = useState(false);
 
+  // Age divisions dialog
+  const [ageDivisionsOpen, setAgeDivisionsOpen] = useState(false);
+
   // ── Stats ──────────────────────────────────────────────────
   const stats = useMemo(
     () => ({
@@ -858,6 +1061,7 @@ export function RosterClient({ initialPlayers, initialTeams }: RosterClientProps
   // ── Filtered + Sorted rows ─────────────────────────────────
   const rows = useMemo(() => {
     let list = players;
+    if (hideInactive) list = list.filter((p) => p.status !== "inactive");
     if (statusFilter !== "all") list = list.filter((p) => p.status === statusFilter);
     if (selectedTeamNames.size > 0) {
       list = list.filter((p) =>
@@ -898,7 +1102,7 @@ export function RosterClient({ initialPlayers, initialTeams }: RosterClientProps
       const cmp = av.localeCompare(bv);
       return sortDir === "asc" ? cmp : -cmp;
     });
-  }, [players, statusFilter, selectedTeamNames, search, sortKey, sortDir]);
+  }, [players, hideInactive, statusFilter, selectedTeamNames, search, sortKey, sortDir]);
 
   // ── Sort toggle ───────────────────────────────────────────
   const handleSort = (key: SortKey) => {
@@ -1027,14 +1231,30 @@ export function RosterClient({ initialPlayers, initialTeams }: RosterClientProps
   };
 
   // ── Team filter helpers ───────────────────────────────────
-  const toggleTeamFilter = (name: string) => {
-    setSelectedTeamNames((prev) => {
+  const handleTeamFilterOpenChange = useCallback((open: boolean) => {
+    if (open) setPendingTeamNames(new Set(selectedTeamNames));
+    setTeamFilterOpen(open);
+  }, [selectedTeamNames]);
+
+  const togglePending = useCallback((name: string) => {
+    setPendingTeamNames((prev) => {
       const next = new Set(prev);
       if (next.has(name)) next.delete(name);
       else next.add(name);
       return next;
     });
-  };
+  }, []);
+
+  const applyTeamFilter = useCallback(() => {
+    setSelectedTeamNames(new Set(pendingTeamNames));
+    setTeamFilterOpen(false);
+  }, [pendingTeamNames]);
+
+  const clearTeamFilter = useCallback(() => {
+    setSelectedTeamNames(new Set());
+    setPendingTeamNames(new Set());
+    setTeamFilterOpen(false);
+  }, []);
 
   // All distinct team names present in the player list (covers virtual teams too)
   const allTeamNames = useMemo(() => {
@@ -1057,6 +1277,10 @@ export function RosterClient({ initialPlayers, initialTeams }: RosterClientProps
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setAgeDivisionsOpen(true)}>
+            <Calendar className="mr-2 h-4 w-4" />
+            Age Divisions
+          </Button>
           <Button variant="outline" onClick={() => setTeamsDialogOpen(true)}>
             <Shield className="mr-2 h-4 w-4" />
             Manage Teams
@@ -1126,42 +1350,72 @@ export function RosterClient({ initialPlayers, initialTeams }: RosterClientProps
           </SelectContent>
         </Select>
 
-        {/* Multi-select team filter */}
+        {/* Show / hide inactive toggle */}
+        <Button
+          variant={hideInactive ? "outline" : "secondary"}
+          size="sm"
+          className="h-9 text-xs"
+          onClick={() => setHideInactive((v) => !v)}
+          title={hideInactive ? "Inactive players are hidden — click to show" : "Click to hide inactive players"}
+        >
+          {hideInactive ? (
+            <><UserX className="h-3.5 w-3.5 mr-1.5 text-gray-400" />Show Inactive ({stats.inactive})</>
+          ) : (
+            <><UserCheck className="h-3.5 w-3.5 mr-1.5 text-green-600" />Hide Inactive</>
+          )}
+        </Button>
+
+        {/* Multi-select team filter — checkbox style with OK button */}
         {allTeamNames.length > 0 && (
-          <DropdownMenu>
+          <DropdownMenu open={teamFilterOpen} onOpenChange={handleTeamFilterOpenChange}>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="h-9 gap-1.5">
                 <Users className="h-3.5 w-3.5" />
                 {selectedTeamNames.size === 0
                   ? "All Teams"
-                  : `${selectedTeamNames.size} team${selectedTeamNames.size > 1 ? "s" : ""}`}
+                  : `${selectedTeamNames.size} team${selectedTeamNames.size > 1 ? "s" : ""} selected`}
                 <ChevronDown className="h-3.5 w-3.5 opacity-50" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-60">
-              <DropdownMenuLabel>Filter by Team</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {allTeamNames.map((name) => (
-                <DropdownMenuItem
-                  key={name}
-                  onSelect={(e) => { e.preventDefault(); toggleTeamFilter(name); }}
-                  className="flex items-center justify-between cursor-pointer"
-                >
-                  <span className="truncate">{name}</span>
-                  {selectedTeamNames.has(name) && <Check className="h-3.5 w-3.5 text-blue-600 shrink-0" />}
-                </DropdownMenuItem>
-              ))}
-              {selectedTeamNames.size > 0 && (
-                <>
-                  <DropdownMenuSeparator />
+            <DropdownMenuContent align="start" className="w-64 p-0">
+              <DropdownMenuLabel className="px-3 py-2 text-xs">Filter by Team</DropdownMenuLabel>
+              <DropdownMenuSeparator className="my-0" />
+              <div className="max-h-52 overflow-y-auto py-1">
+                {allTeamNames.map((name) => (
                   <DropdownMenuItem
-                    onSelect={(e) => { e.preventDefault(); setSelectedTeamNames(new Set()); }}
-                    className="text-gray-500 text-xs cursor-pointer"
+                    key={name}
+                    onSelect={(e) => { e.preventDefault(); togglePending(name); }}
+                    className="flex items-center gap-2.5 px-3 py-2 cursor-pointer"
                   >
-                    <X className="mr-1.5 h-3 w-3" /> Clear filter
+                    <div className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 transition-colors ${
+                      pendingTeamNames.has(name)
+                        ? "border-blue-600 bg-blue-600"
+                        : "border-gray-300 bg-white"
+                    }`}>
+                      {pendingTeamNames.has(name) && <Check className="h-2.5 w-2.5 text-white" />}
+                    </div>
+                    <span className="truncate text-sm">{name}</span>
                   </DropdownMenuItem>
-                </>
-              )}
+                ))}
+              </div>
+              <DropdownMenuSeparator className="my-0" />
+              <div className="flex items-center justify-between gap-2 px-3 py-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs text-gray-500"
+                  onClick={() => setPendingTeamNames(new Set())}
+                >
+                  Clear all
+                </Button>
+                <Button
+                  size="sm"
+                  className="h-7 px-3 text-xs"
+                  onClick={applyTeamFilter}
+                >
+                  OK
+                </Button>
+              </div>
             </DropdownMenuContent>
           </DropdownMenu>
         )}
@@ -1174,12 +1428,24 @@ export function RosterClient({ initialPlayers, initialTeams }: RosterClientProps
                 key={name}
                 variant="outline"
                 className="gap-1 pr-1 text-xs bg-blue-50 border-blue-200 text-blue-700 cursor-pointer"
-                onClick={() => toggleTeamFilter(name)}
+                onClick={() => {
+                  setSelectedTeamNames((prev) => {
+                    const next = new Set(prev);
+                    next.delete(name);
+                    return next;
+                  });
+                }}
               >
                 {name}
                 <X className="h-2.5 w-2.5" />
               </Badge>
             ))}
+            <button
+              className="text-xs text-gray-400 hover:text-gray-600 underline"
+              onClick={clearTeamFilter}
+            >
+              Clear all
+            </button>
           </div>
         )}
       </div>
@@ -1471,6 +1737,14 @@ export function RosterClient({ initialPlayers, initialTeams }: RosterClientProps
         onOpenChange={setImportOpen}
         teams={teams}
         onImported={(freshPlayers) => setPlayers(freshPlayers)}
+      />
+
+      {/* Age Divisions */}
+      <AgeDivisionsDialog
+        open={ageDivisionsOpen}
+        onClose={() => setAgeDivisionsOpen(false)}
+        players={players}
+        onPlayersUpdated={setPlayers}
       />
     </div>
   );
