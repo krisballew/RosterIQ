@@ -1192,6 +1192,85 @@ export function LineupBuilderClient({ initialTeams, initialUnassigned }: LineupB
                 <Redo2 className="h-3.5 w-3.5 mr-1" />
                 Redo
               </Button>
+
+              {/* Team selector */}
+              <DropdownMenu
+                open={sandboxTeamFilterOpen}
+                onOpenChange={(open) => {
+                  if (open) setPendingSandboxTeamIds(new Set(sandboxVisibleTeamIds));
+                  setSandboxTeamFilterOpen(open);
+                }}
+              >
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Users className="h-3.5 w-3.5 mr-1" />
+                    {sandboxVisibleTeamIds.size === initialTeams.length
+                      ? `All ${initialTeams.length} teams`
+                      : `${sandboxVisibleTeamIds.size} team${sandboxVisibleTeamIds.size !== 1 ? "s" : ""} shown`}
+                    <ChevronDown className="h-3 w-3 ml-1" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-56" onCloseAutoFocus={(e) => e.preventDefault()}>
+                  <DropdownMenuLabel className="text-xs text-gray-500">Show up to 5 teams</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {initialTeams.map((team) => {
+                    const checked = pendingSandboxTeamIds.has(team.id);
+                    const atMax = pendingSandboxTeamIds.size >= 5 && !checked;
+                    return (
+                      <DropdownMenuItem
+                        key={team.id}
+                        className={`flex items-center gap-2 cursor-pointer ${atMax ? "opacity-40 cursor-not-allowed" : ""}`}
+                        onSelect={(e) => {
+                          e.preventDefault();
+                          if (atMax) return;
+                          setPendingSandboxTeamIds((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(team.id)) next.delete(team.id);
+                            else next.add(team.id);
+                            return next;
+                          });
+                        }}
+                      >
+                        <div className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 ${
+                          checked ? "bg-blue-600 border-blue-600" : "border-gray-300"
+                        }`}>
+                          {checked && <Check className="h-3 w-3 text-white" />}
+                        </div>
+                        <span className="truncate text-sm">{team.name}</span>
+                      </DropdownMenuItem>
+                    );
+                  })}
+                  <DropdownMenuSeparator />
+                  <div className="flex items-center justify-between px-2 py-1.5 gap-2">
+                    <span className="text-xs text-gray-400">Max 5 teams</span>
+                    <div className="flex gap-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 px-2 text-xs"
+                        onClick={() => {
+                          const first = initialTeams.slice(0, 1).map((t) => t.id);
+                          setPendingSandboxTeamIds(new Set(first));
+                        }}
+                      >
+                        Clear
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="h-6 px-2 text-xs"
+                        disabled={pendingSandboxTeamIds.size === 0}
+                        onClick={() => {
+                          setSandboxVisibleTeamIds(new Set(pendingSandboxTeamIds));
+                          setSandboxTeamFilterOpen(false);
+                        }}
+                      >
+                        OK
+                      </Button>
+                    </div>
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
               <div className="flex-1" />
               {hasSandboxChanges && (
                 <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
@@ -1225,8 +1304,10 @@ export function LineupBuilderClient({ initialTeams, initialUnassigned }: LineupB
             </div>
 
             {/* Teams grid */}
-            <div className="flex gap-3 flex-1 overflow-x-auto overflow-y-auto pb-2">
-              {initialTeams.map((team) => (
+            <div className="flex gap-3 flex-1 overflow-y-auto pb-2">
+              {initialTeams
+                .filter((team) => sandboxVisibleTeamIds.has(team.id))
+                .map((team) => (
                 <TeamColumn
                   key={team.id}
                   team={team}
