@@ -15,6 +15,9 @@ import {
   X,
   Shield,
   Trash2,
+  Upload,
+  FileText,
+  AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -392,6 +395,387 @@ function TeamFormDialog({ open, onOpenChange, initialData, title, onSubmit, subm
 }
 
 // ─────────────────────────────────────────────────────────────
+// TeamSnap CSV parser + import dialog
+// ─────────────────────────────────────────────────────────────
+
+/** Parse a CSV string into an array of row-objects keyed by header. */
+function parseCsv(text: string): Record<string, string>[] {
+  const lines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
+  if (lines.length < 2) return [];
+
+  function splitRow(line: string): string[] {
+    const fields: string[] = [];
+    let cur = "";
+    let inQuote = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (inQuote) {
+        if (ch === '"' && line[i + 1] === '"') { cur += '"'; i++; }
+        else if (ch === '"') inQuote = false;
+        else cur += ch;
+      } else {
+        if (ch === '"') inQuote = true;
+        else if (ch === ',') { fields.push(cur); cur = ""; }
+        else cur += ch;
+      }
+    }
+    fields.push(cur);
+    return fields;
+  }
+
+  const headers = splitRow(lines[0]).map((h) => h.trim());
+  const rows: Record<string, string>[] = [];
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+    const vals = splitRow(line);
+    const obj: Record<string, string> = {};
+    headers.forEach((h, idx) => { obj[h] = (vals[idx] ?? "").trim(); });
+    rows.push(obj);
+  }
+  return rows;
+}
+
+/** Normalise a date string to YYYY-MM-DD. Handles MM/DD/YYYY and YYYY-MM-DD. */
+function normalizeDob(raw: string): string | null {
+  const s = raw.trim();
+  if (!s) return null;
+  // MM/DD/YYYY
+  const mdy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (mdy) return `${mdy[3]}-${mdy[1].padStart(2, "0")}-${mdy[2].padStart(2, "0")}`;
+  // YYYY-MM-DD already
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  // Try native parse as last resort
+  const d = new Date(s);
+  if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  return null;
+}
+
+/** Pick the first matching key (case-insensitive) from a row. */
+function pickField(row: Record<string, string>, ...candidates: string[]): string {
+  for (const c of candidates) {
+    const key = Object.keys(row).find((k) => k.toLowerCase() === c.toLowerCase());
+    if (key !== undefined && row[key]) return row[key];
+  }
+  return "";
+}
+
+interface ImportedPlayer {
+  first_name: string;
+  last_name: string;
+  date_of_birth: string | null;
+  team_assigned: string | null;
+  primary_parent_email: string | null;
+  secondary_parent_email: string | null;
+  positions: string[];
+}
+
+function mapTeamsnapRow(row: Record<string, string>): ImportedPlayer | null {
+  const first = pickField(row, "First", "First Name", "FirstName");
+  const last = pickField(row, "Last", "Last Name", "LastName");
+  if (!first || !last) return null;
+
+  // TeamSnap "Member Type" can include coaches/managers — skip non-players
+  const memberType = pickField(row, "Member Type", "Type", "Role").toLowerCase();
+  if (memberType && !memberType.includes("player") && memberType !== "") {
+    // Only skip when the field is explicitly non-player (allow blank)
+    if (["coach", "manager", "owner", "non-player"].some((t) => memberType.includes(t))) return null;
+  }
+
+  const dobRaw = pickField(row, "Birthdate", "Birthday", "Date of Birth", "DOB", "Birth Date");
+  const dob = normalizeDob(dobRaw);
+
+  const team = pickField(row, "Team", "Team Name", "Team Assigned");
+  const div = pickField(row, "Age Division", "Age Group", "Division", "Age Level");
+
+  // Primary parent email: prefer contact columns, fall back to player email
+  const email1 = pickField(row,
+    "Contact #1 Email", "Contact 1 Email", "Contact Email", "Contact Email Address",
+    "Parent Email", "Guardian Email", "Email Address", "Email"
+  );
+  const email2 = pickField(row,
+    "Contact #2 Email", "Contact 2 Email", "Secondary Email",
+    "Secondary Contact Email", "Secondary Parent Email"
+  );
+
+  const posRaw = pickField(row, "Position", "Positions", "Preferred Position");
+  const positions = posRaw
+    ? posRaw.split(/[,/;]/).map((p) => p.trim().toUpperCase()).filter(Boolean)
+    : [];
+
+  return {
+    first_name: first,
+    last_name: last,
+    date_of_birth: dob,
+    team_assigned: team || null,
+    primary_parent_email: email1 || null,
+    secondary_parent_email: email2 || null,
+    positions,
+  };
+}
+
+function ImportPlayersDialog({
+  open,
+  onOpenChange,
+  teams,
+  onImported,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  teams: Team[];
+  onImported: (players: Player[]) => void;
+}) {
+  const [step, setStep] = useState<"upload" | "preview" | "done">("upload");
+  const [parsed, setParsed] = useState<ImportedPlayer[]>([]);
+  const [parseError, setParseError] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [result, setResult] = useState<{ inserted: number; skipped: number; skippedNames: string[]; errors: string[] } | null>(null);
+  const [defaultTeam, setDefaultTeam] = useState("");
+  const [dragOver, setDragOver] = useState(false);
+
+  const reset = () => {
+    setStep("upload");
+    setParsed([]);
+    setParseError(null);
+    setResult(null);
+    setDefaultTeam("");
+  };
+
+  const handleOpenChange = (v: boolean) => {
+    if (!v) reset();
+    onOpenChange(v);
+  };
+
+  const handleFile = (file: File) => {
+    setParseError(null);
+    if (!file.name.endsWith(".csv")) { setParseError("Please upload a .csv file."); return; }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      const rows = parseCsv(text);
+      if (rows.length === 0) { setParseError("No data rows found in the CSV."); return; }
+      const players = rows.map(mapTeamsnapRow).filter((p): p is ImportedPlayer => p !== null);
+      if (players.length === 0) { setParseError("Could not find player rows. Make sure the file is a TeamSnap roster export."); return; }
+      setParsed(players);
+      setStep("preview");
+    };
+    reader.readAsText(file);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (file) handleFile(file);
+  };
+
+  const handleImport = async () => {
+    setImporting(true);
+    try {
+      const payload = parsed.map((p) => ({
+        ...p,
+        team_assigned: p.team_assigned || defaultTeam || null,
+        status: "active" as const,
+      }));
+      const res = await fetch("/api/app/players/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ players: payload }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Import failed");
+      setResult(json);
+      setStep("done");
+      // Refresh player list by re-fetching
+      const reloadRes = await fetch("/api/app/players");
+      if (reloadRes.ok) {
+        const data = await reloadRes.json();
+        onImported(data.players ?? []);
+      }
+    } catch (e) {
+      setParseError(e instanceof Error ? e.message : "Import failed");
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Upload className="h-5 w-5" /> Import Players from TeamSnap
+          </DialogTitle>
+          <DialogDescription>
+            Export your roster from TeamSnap (Roster → Export Roster as CSV), then upload it here.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="flex-1 overflow-y-auto min-h-0">
+          {/* ── Step 1: Upload ── */}
+          {step === "upload" && (
+            <div className="py-4 space-y-4">
+              <div
+                className={`relative flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed p-10 transition-colors cursor-pointer ${dragOver ? "border-blue-400 bg-blue-50" : "border-gray-300 bg-gray-50 hover:border-gray-400"}`}
+                onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={handleDrop}
+                onClick={() => document.getElementById("ts-file-input")?.click()}
+              >
+                <FileText className="h-10 w-10 text-gray-400" />
+                <p className="text-sm text-gray-700 font-medium">Drop your TeamSnap CSV here, or click to browse</p>
+                <p className="text-xs text-gray-500">Supports TeamSnap roster exports (.csv)</p>
+                <input
+                  id="ts-file-input"
+                  type="file"
+                  accept=".csv"
+                  className="sr-only"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ""; }}
+                />
+              </div>
+
+              {parseError && (
+                <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                  {parseError}
+                </div>
+              )}
+
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800 space-y-1">
+                <p className="font-semibold">How to export from TeamSnap:</p>
+                <ol className="list-decimal ml-4 space-y-0.5">
+                  <li>In TeamSnap, open your team and go to <strong>Roster</strong>.</li>
+                  <li>Click the <strong>Export</strong> button (top-right) → <strong>Export as CSV</strong>.</li>
+                  <li>Save the file and upload it above.</li>
+                </ol>
+              </div>
+            </div>
+          )}
+
+          {/* ── Step 2: Preview ── */}
+          {step === "preview" && (
+            <div className="py-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-gray-700">
+                  Found <strong>{parsed.length}</strong> player{parsed.length !== 1 ? "s" : ""} in the CSV. Review and confirm below.
+                </p>
+                <Button variant="ghost" size="sm" onClick={reset}>Start over</Button>
+              </div>
+
+              {/* Optional default team override */}
+              {teams.length > 0 && (
+                <div className="flex items-center gap-3">
+                  <Label className="text-sm shrink-0">Override team assignment:</Label>
+                  <Select value={defaultTeam || "__keep__"} onValueChange={(v) => setDefaultTeam(v === "__keep__" ? "" : v)}>
+                    <SelectTrigger className="w-56 h-8 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__keep__">Keep CSV value</SelectItem>
+                      <SelectItem value="">— Unassigned —</SelectItem>
+                      {teams.map((t) => (
+                        <SelectItem key={t.id} value={t.name}>{t.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              <div className="rounded-xl border border-gray-200 overflow-auto max-h-80">
+                <table className="min-w-full text-xs divide-y divide-gray-100">
+                  <thead className="bg-gray-50 text-gray-500 uppercase tracking-wider font-semibold">
+                    <tr>
+                      <th className="px-3 py-2 text-left">#</th>
+                      <th className="px-3 py-2 text-left">First</th>
+                      <th className="px-3 py-2 text-left">Last</th>
+                      <th className="px-3 py-2 text-left">DOB</th>
+                      <th className="px-3 py-2 text-left">Team</th>
+                      <th className="px-3 py-2 text-left">Primary Email</th>
+                      <th className="px-3 py-2 text-left">Positions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {parsed.map((p, i) => (
+                      <tr key={i} className="hover:bg-gray-50/60">
+                        <td className="px-3 py-1.5 text-gray-400">{i + 1}</td>
+                        <td className="px-3 py-1.5 text-gray-900">{p.first_name}</td>
+                        <td className="px-3 py-1.5 text-gray-900">{p.last_name}</td>
+                        <td className="px-3 py-1.5 text-gray-600">{p.date_of_birth ?? <span className="text-gray-300">—</span>}</td>
+                        <td className="px-3 py-1.5 text-gray-600">{(defaultTeam || p.team_assigned) ?? <span className="text-gray-300">—</span>}</td>
+                        <td className="px-3 py-1.5 text-gray-600 max-w-[160px] truncate">{p.primary_parent_email ?? <span className="text-gray-300">—</span>}</td>
+                        <td className="px-3 py-1.5 text-gray-600">{p.positions.join(", ") || <span className="text-gray-300">—</span>}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {parseError && (
+                <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                  {parseError}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Step 3: Done ── */}
+          {step === "done" && result && (
+            <div className="py-6 space-y-4">
+              <div className="flex flex-col items-center gap-3 text-center">
+                <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center">
+                  <Check className="h-6 w-6 text-green-600" />
+                </div>
+                <div>
+                  <p className="text-lg font-semibold text-gray-900">Import complete!</p>
+                  <p className="text-sm text-gray-500">
+                    <strong>{result.inserted}</strong> player{result.inserted !== 1 ? "s" : ""} added
+                    {result.skipped > 0 && `, ${result.skipped} duplicate${result.skipped !== 1 ? "s" : ""} skipped`}.
+                  </p>
+                </div>
+              </div>
+              {result.skippedNames.length > 0 && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                  <p className="text-xs font-semibold text-amber-800 mb-1">Skipped (already exist):</p>
+                  <p className="text-xs text-amber-700">{result.skippedNames.join(", ")}</p>
+                </div>
+              )}
+              {result.errors.length > 0 && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2">
+                  <p className="text-xs font-semibold text-red-700 mb-1">Errors:</p>
+                  {result.errors.map((e, i) => <p key={i} className="text-xs text-red-600">{e}</p>)}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <DialogFooter className="border-t pt-3 shrink-0">
+          {step === "upload" && (
+            <Button variant="outline" onClick={() => handleOpenChange(false)}>Cancel</Button>
+          )}
+          {step === "preview" && (
+            <>
+              <Button variant="outline" onClick={reset} disabled={importing}>Back</Button>
+              <Button onClick={handleImport} disabled={importing}>
+                {importing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Import {parsed.length} Player{parsed.length !== 1 ? "s" : ""}
+              </Button>
+            </>
+          )}
+          {step === "done" && (
+            <>
+              <Button variant="outline" onClick={reset}>Import Another File</Button>
+              <Button onClick={() => handleOpenChange(false)}>Done</Button>
+            </>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
 // Main component
 // ─────────────────────────────────────────────────────────────
 
@@ -429,6 +813,9 @@ export function RosterClient({ initialPlayers, initialTeams }: RosterClientProps
   const [editTeam, setEditTeam] = useState<Team | null>(null);
   const [deleteTeam, setDeleteTeam] = useState<Team | null>(null);
   const [deletingTeam, setDeletingTeam] = useState(false);
+
+  // Import dialog
+  const [importOpen, setImportOpen] = useState(false);
 
   // ── Stats ──────────────────────────────────────────────────
   const stats = useMemo(
@@ -648,6 +1035,10 @@ export function RosterClient({ initialPlayers, initialTeams }: RosterClientProps
             {teams.length > 0 && (
               <Badge variant="outline" className="ml-2 text-xs">{teams.length}</Badge>
             )}
+          </Button>
+          <Button variant="outline" onClick={() => setImportOpen(true)}>
+            <Upload className="mr-2 h-4 w-4" />
+            Import from TeamSnap
           </Button>
           <Button onClick={() => setAddOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />
@@ -1046,6 +1437,13 @@ export function RosterClient({ initialPlayers, initialTeams }: RosterClientProps
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {/* Import from TeamSnap */}
+      <ImportPlayersDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        teams={teams}
+        onImported={(freshPlayers) => setPlayers(freshPlayers)}
+      />
     </div>
   );
 }
