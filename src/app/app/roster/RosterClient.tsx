@@ -11,6 +11,10 @@ import {
   Users,
   ChevronUp,
   ChevronDown,
+  Check,
+  X,
+  Shield,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,7 +35,15 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import type { Player, PlayerStatus } from "@/types/database";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import type { Player, PlayerStatus, Team } from "@/types/database";
 
 // ─────────────────────────────────────────────────────────────
 // Types
@@ -57,6 +69,20 @@ const EMPTY_FORM: PlayerFormData = {
   primary_parent_email: "",
   secondary_parent_email: "",
   status: "active",
+};
+
+interface TeamFormData {
+  name: string;
+  age_division: string;
+  birth_year: string;
+  roster_limit: string;
+}
+
+const EMPTY_TEAM_FORM: TeamFormData = {
+  name: "",
+  age_division: "",
+  birth_year: "",
+  roster_limit: "16",
 };
 
 const STATUS_CONFIG: Record<PlayerStatus, { label: string; className: string }> = {
@@ -96,6 +122,7 @@ interface PlayerFormDialogProps {
   description?: string;
   onSubmit: (data: PlayerFormData) => Promise<void>;
   submitLabel: string;
+  teams: Team[];
 }
 
 function PlayerFormDialog({
@@ -106,6 +133,7 @@ function PlayerFormDialog({
   description,
   onSubmit,
   submitLabel,
+  teams,
 }: PlayerFormDialogProps) {
   const [form, setForm] = useState<PlayerFormData>({ ...EMPTY_FORM, ...initialData });
   const [saving, setSaving] = useState(false);
@@ -178,12 +206,31 @@ function PlayerFormDialog({
           {/* Team */}
           <div className="space-y-1">
             <Label htmlFor="team_assigned">Team</Label>
-            <Input
-              id="team_assigned"
-              value={form.team_assigned}
-              onChange={(e) => set("team_assigned", e.target.value)}
-              placeholder="e.g. U14 Select Red"
-            />
+            {teams.length > 0 ? (
+              <Select
+                value={form.team_assigned || "__none__"}
+                onValueChange={(v) => set("team_assigned", v === "__none__" ? "" : v)}
+              >
+                <SelectTrigger id="team_assigned">
+                  <SelectValue placeholder="Select a team" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">— Unassigned —</SelectItem>
+                  {teams.map((t) => (
+                    <SelectItem key={t.id} value={t.name}>
+                      {t.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <Input
+                id="team_assigned"
+                value={form.team_assigned}
+                onChange={(e) => set("team_assigned", e.target.value)}
+                placeholder="e.g. U14 Select Red"
+              />
+            )}
           </div>
 
           {/* Age Division */}
@@ -268,32 +315,120 @@ function PlayerFormDialog({
 }
 
 // ─────────────────────────────────────────────────────────────
+// Team form dialog (add / edit a team)
+// ─────────────────────────────────────────────────────────────
+
+interface TeamFormDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  initialData?: Partial<TeamFormData>;
+  title: string;
+  onSubmit: (data: TeamFormData) => Promise<void>;
+  submitLabel: string;
+}
+
+function TeamFormDialog({ open, onOpenChange, initialData, title, onSubmit, submitLabel }: TeamFormDialogProps) {
+  const [form, setForm] = useState<TeamFormData>({ ...EMPTY_TEAM_FORM, ...initialData });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleOpenChange = (val: boolean) => {
+    if (val) { setForm({ ...EMPTY_TEAM_FORM, ...initialData }); setError(null); }
+    onOpenChange(val);
+  };
+
+  const set = (field: keyof TeamFormData, value: string) =>
+    setForm((prev) => ({ ...prev, [field]: value }));
+
+  const handleSave = async () => {
+    setError(null);
+    if (!form.name.trim()) { setError("Team name is required."); return; }
+    setSaving(true);
+    try {
+      await onSubmit(form);
+      onOpenChange(false);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "An error occurred.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+        </DialogHeader>
+        <div className="grid grid-cols-2 gap-4 py-2">
+          <div className="col-span-2 space-y-1">
+            <Label htmlFor="t_name">Team Name <span className="text-red-500">*</span></Label>
+            <Input id="t_name" value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="e.g. U14 Select Red" />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="t_div">Age Division</Label>
+            <Input id="t_div" value={form.age_division} onChange={(e) => set("age_division", e.target.value)} placeholder="e.g. U14" />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="t_year">Birth Year</Label>
+            <Input id="t_year" type="number" value={form.birth_year} onChange={(e) => set("birth_year", e.target.value)} placeholder="e.g. 2011" />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="t_limit">Roster Limit</Label>
+            <Input id="t_limit" type="number" value={form.roster_limit} onChange={(e) => set("roster_limit", e.target.value)} placeholder="16" />
+          </div>
+        </div>
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cancel</Button>
+          <Button onClick={handleSave} disabled={saving}>
+            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {submitLabel}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
 // Main component
 // ─────────────────────────────────────────────────────────────
 
 interface RosterClientProps {
   initialPlayers: Player[];
+  initialTeams: Team[];
 }
 
 type SortKey = "name" | "team_assigned" | "age_division" | "date_of_birth" | "status";
 type SortDir = "asc" | "desc";
 
-export function RosterClient({ initialPlayers }: RosterClientProps) {
+export function RosterClient({ initialPlayers, initialTeams }: RosterClientProps) {
   const [players, setPlayers] = useState<Player[]>(initialPlayers);
+  const [teams, setTeams] = useState<Team[]>(initialTeams);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | PlayerStatus>("all");
+  // multi-select team filter — empty Set = show all
+  const [selectedTeamNames, setSelectedTeamNames] = useState<Set<string>>(new Set());
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
 
-  // Add dialog
+  // Add player dialog
   const [addOpen, setAddOpen] = useState(false);
 
-  // Edit dialog
+  // Edit player dialog
   const [editPlayer, setEditPlayer] = useState<Player | null>(null);
 
   // Deactivate confirm
   const [deactivatePlayer, setDeactivatePlayer] = useState<Player | null>(null);
   const [deactivating, setDeactivating] = useState(false);
+
+  // Team management dialog
+  const [teamsDialogOpen, setTeamsDialogOpen] = useState(false);
+  const [addTeamOpen, setAddTeamOpen] = useState(false);
+  const [editTeam, setEditTeam] = useState<Team | null>(null);
+  const [deleteTeam, setDeleteTeam] = useState<Team | null>(null);
+  const [deletingTeam, setDeletingTeam] = useState(false);
 
   // ── Stats ──────────────────────────────────────────────────
   const stats = useMemo(
@@ -309,6 +444,12 @@ export function RosterClient({ initialPlayers }: RosterClientProps) {
   const rows = useMemo(() => {
     let list = players;
     if (statusFilter !== "all") list = list.filter((p) => p.status === statusFilter);
+    if (selectedTeamNames.size > 0) {
+      list = list.filter((p) =>
+        selectedTeamNames.has(p.team_assigned ?? "") ||
+        (selectedTeamNames.has("__unassigned__") && !p.team_assigned)
+      );
+    }
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter(
@@ -342,7 +483,7 @@ export function RosterClient({ initialPlayers }: RosterClientProps) {
       const cmp = av.localeCompare(bv);
       return sortDir === "asc" ? cmp : -cmp;
     });
-  }, [players, statusFilter, search, sortKey, sortDir]);
+  }, [players, statusFilter, selectedTeamNames, search, sortKey, sortDir]);
 
   // ── Sort toggle ───────────────────────────────────────────
   const handleSort = (key: SortKey) => {
@@ -412,6 +553,83 @@ export function RosterClient({ initialPlayers }: RosterClientProps) {
     }
   };
 
+  // ── Team CRUD ─────────────────────────────────────────────
+  const handleAddTeam = async (data: TeamFormData) => {
+    const res = await fetch("/api/app/teams", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: data.name.trim(),
+        age_division: data.age_division.trim() || null,
+        birth_year: data.birth_year ? Number(data.birth_year) : null,
+        roster_limit: data.roster_limit ? Number(data.roster_limit) : 16,
+      }),
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error ?? "Failed to create team");
+    setTeams((prev) => [...prev, json.team].sort((a, b) => a.name.localeCompare(b.name)));
+  };
+
+  const handleEditTeam = async (data: TeamFormData) => {
+    if (!editTeam) return;
+    const res = await fetch(`/api/app/teams/${editTeam.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: data.name.trim(),
+        age_division: data.age_division.trim() || null,
+        birth_year: data.birth_year ? Number(data.birth_year) : null,
+        roster_limit: data.roster_limit ? Number(data.roster_limit) : 16,
+      }),
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error ?? "Failed to update team");
+    setTeams((prev) =>
+      prev.map((t) => (t.id === editTeam.id ? json.team : t)).sort((a, b) => a.name.localeCompare(b.name))
+    );
+    setEditTeam(null);
+  };
+
+  const handleDeleteTeam = async () => {
+    if (!deleteTeam) return;
+    setDeletingTeam(true);
+    try {
+      const res = await fetch(`/api/app/teams/${deleteTeam.id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const json = await res.json();
+        throw new Error(json.error ?? "Failed to delete team");
+      }
+      setTeams((prev) => prev.filter((t) => t.id !== deleteTeam.id));
+      setSelectedTeamNames((prev) => {
+        const next = new Set(prev);
+        next.delete(deleteTeam.name);
+        return next;
+      });
+    } finally {
+      setDeletingTeam(false);
+      setDeleteTeam(null);
+    }
+  };
+
+  // ── Team filter helpers ───────────────────────────────────
+  const toggleTeamFilter = (name: string) => {
+    setSelectedTeamNames((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  };
+
+  // All distinct team names present in the player list (covers virtual teams too)
+  const allTeamNames = useMemo(() => {
+    const fromTeams = teams.map((t) => t.name);
+    const fromPlayers = players
+      .map((p) => p.team_assigned)
+      .filter((n): n is string => !!n);
+    return Array.from(new Set([...fromTeams, ...fromPlayers])).sort();
+  }, [teams, players]);
+
   // ── Render ─────────────────────────────────────────────────
   return (
     <div className="max-w-7xl mx-auto">
@@ -423,10 +641,19 @@ export function RosterClient({ initialPlayers }: RosterClientProps) {
             Add, edit, and manage players registered with your club.
           </p>
         </div>
-        <Button onClick={() => setAddOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Player
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setTeamsDialogOpen(true)}>
+            <Shield className="mr-2 h-4 w-4" />
+            Manage Teams
+            {teams.length > 0 && (
+              <Badge variant="outline" className="ml-2 text-xs">{teams.length}</Badge>
+            )}
+          </Button>
+          <Button onClick={() => setAddOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Player
+          </Button>
+        </div>
       </div>
 
       {/* Stats bar */}
@@ -455,7 +682,7 @@ export function RosterClient({ initialPlayers }: RosterClientProps) {
       </div>
 
       {/* Filters */}
-      <div className="mb-4 flex items-center gap-3">
+      <div className="mb-4 flex items-center gap-3 flex-wrap">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
           <Input
@@ -479,6 +706,63 @@ export function RosterClient({ initialPlayers }: RosterClientProps) {
             <SelectItem value="inactive">Inactive</SelectItem>
           </SelectContent>
         </Select>
+
+        {/* Multi-select team filter */}
+        {allTeamNames.length > 0 && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="h-9 gap-1.5">
+                <Users className="h-3.5 w-3.5" />
+                {selectedTeamNames.size === 0
+                  ? "All Teams"
+                  : `${selectedTeamNames.size} team${selectedTeamNames.size > 1 ? "s" : ""}`}
+                <ChevronDown className="h-3.5 w-3.5 opacity-50" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-60">
+              <DropdownMenuLabel>Filter by Team</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {allTeamNames.map((name) => (
+                <DropdownMenuItem
+                  key={name}
+                  onSelect={(e) => { e.preventDefault(); toggleTeamFilter(name); }}
+                  className="flex items-center justify-between cursor-pointer"
+                >
+                  <span className="truncate">{name}</span>
+                  {selectedTeamNames.has(name) && <Check className="h-3.5 w-3.5 text-blue-600 shrink-0" />}
+                </DropdownMenuItem>
+              ))}
+              {selectedTeamNames.size > 0 && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onSelect={(e) => { e.preventDefault(); setSelectedTeamNames(new Set()); }}
+                    className="text-gray-500 text-xs cursor-pointer"
+                  >
+                    <X className="mr-1.5 h-3 w-3" /> Clear filter
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+
+        {/* Active team filter chips */}
+        {selectedTeamNames.size > 0 && (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {Array.from(selectedTeamNames).map((name) => (
+              <Badge
+                key={name}
+                variant="outline"
+                className="gap-1 pr-1 text-xs bg-blue-50 border-blue-200 text-blue-700 cursor-pointer"
+                onClick={() => toggleTeamFilter(name)}
+              >
+                {name}
+                <X className="h-2.5 w-2.5" />
+              </Badge>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Table */}
@@ -604,6 +888,7 @@ export function RosterClient({ initialPlayers }: RosterClientProps) {
         description="Add a new player to your club roster."
         onSubmit={handleAdd}
         submitLabel="Add Player"
+        teams={teams}
       />
 
       {/* Edit dialog */}
@@ -624,6 +909,7 @@ export function RosterClient({ initialPlayers }: RosterClientProps) {
           title={`Edit — ${editPlayer.first_name} ${editPlayer.last_name}`}
           onSubmit={handleEdit}
           submitLabel="Save Changes"
+          teams={teams}
         />
       )}
 
@@ -655,6 +941,107 @@ export function RosterClient({ initialPlayers }: RosterClientProps) {
             >
               {deactivating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {deactivatePlayer?.status === "active" ? "Deactivate" : "Reactivate"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Team management dialog ──────────────────────────── */}
+      <Dialog open={teamsDialogOpen} onOpenChange={setTeamsDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5" /> Team Management
+            </DialogTitle>
+            <DialogDescription>
+              Add, rename, or remove teams for your club.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto">
+            {teams.length === 0 ? (
+              <p className="text-sm text-gray-500 py-6 text-center">No teams yet. Click Add Team to get started.</p>
+            ) : (
+              <table className="min-w-full text-sm divide-y divide-gray-100">
+                <thead className="bg-gray-50 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                  <tr>
+                    <th className="px-4 py-2 text-left">Name</th>
+                    <th className="px-4 py-2 text-left">Division</th>
+                    <th className="px-4 py-2 text-left">Birth Year</th>
+                    <th className="px-4 py-2 text-left">Limit</th>
+                    <th className="px-4 py-2 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {teams.map((t) => (
+                    <tr key={t.id} className="hover:bg-gray-50/60">
+                      <td className="px-4 py-2 font-medium text-gray-900">{t.name}</td>
+                      <td className="px-4 py-2 text-gray-600">{t.age_division ?? <span className="text-gray-300">—</span>}</td>
+                      <td className="px-4 py-2 text-gray-600">{t.birth_year ?? <span className="text-gray-300">—</span>}</td>
+                      <td className="px-4 py-2 text-gray-600">{t.roster_limit}</td>
+                      <td className="px-4 py-2 text-right">
+                        <div className="inline-flex gap-1">
+                          <Button size="sm" variant="ghost" title="Edit team" onClick={() => setEditTeam(t)}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button size="sm" variant="ghost" title="Delete team" onClick={() => setDeleteTeam(t)}>
+                            <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+          <DialogFooter className="border-t pt-3">
+            <Button onClick={() => setAddTeamOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" /> Add Team
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add team */}
+      <TeamFormDialog
+        open={addTeamOpen}
+        onOpenChange={setAddTeamOpen}
+        title="Add Team"
+        onSubmit={handleAddTeam}
+        submitLabel="Add Team"
+      />
+
+      {/* Edit team */}
+      {editTeam && (
+        <TeamFormDialog
+          open={!!editTeam}
+          onOpenChange={(open) => !open && setEditTeam(null)}
+          initialData={{
+            name: editTeam.name,
+            age_division: editTeam.age_division ?? "",
+            birth_year: editTeam.birth_year?.toString() ?? "",
+            roster_limit: editTeam.roster_limit?.toString() ?? "16",
+          }}
+          title={`Edit — ${editTeam.name}`}
+          onSubmit={handleEditTeam}
+          submitLabel="Save Changes"
+        />
+      )}
+
+      {/* Delete team confirm */}
+      <Dialog open={!!deleteTeam} onOpenChange={(open) => !open && setDeleteTeam(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete Team</DialogTitle>
+            <DialogDescription>
+              Delete <strong>{deleteTeam?.name}</strong>? This only removes the team record — players will keep their team_assigned value.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTeam(null)} disabled={deletingTeam}>Cancel</Button>
+            <Button variant="destructive" onClick={handleDeleteTeam} disabled={deletingTeam}>
+              {deletingTeam && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Delete
             </Button>
           </DialogFooter>
         </DialogContent>
