@@ -31,9 +31,28 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json();
   const moves: Array<{ player_id: string; team_name: string | null }> = body.moves ?? [];
+  const newTeams: Array<{ name: string; age_division?: string | null; roster_limit?: number }> = body.newTeams ?? [];
 
   if (!Array.isArray(moves) || moves.length === 0) {
     return NextResponse.json({ error: "moves array is required" }, { status: 400 });
+  }
+
+  // Create any new (virtual) teams first so players can be assigned to them
+  for (const team of newTeams) {
+    const name = team.name?.trim();
+    if (!name) continue;
+    const { error } = await supabase.from("teams").insert({
+      tenant_id: membership.tenant_id,
+      name,
+      age_division: team.age_division?.trim() ?? null,
+      roster_limit: team.roster_limit ?? 16,
+    });
+    if (error) {
+      return NextResponse.json(
+        { error: `Failed to create team "${name}": ${error.message}` },
+        { status: 500 }
+      );
+    }
   }
 
   // Verify all players belong to this tenant before updating

@@ -28,6 +28,7 @@ import {
   Trash2,
   Check,
   X,
+  Plus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -44,6 +45,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -89,7 +91,8 @@ type SandboxAction =
   | { type: "MOVE_PLAYER"; playerId: string; fromTeamId: string | "unassigned"; toTeamId: string | "unassigned" }
   | { type: "RESET"; initial: SimState }
   | { type: "UNDO" }
-  | { type: "REDO" };
+  | { type: "REDO" }
+  | { type: "INIT_TEAM"; teamId: string };
 
 function buildInitialSim(teams: TeamWithPlayers[], unassigned: Player[]): SimState {
   const rosters: RosterMap = {};
@@ -121,6 +124,15 @@ function sandboxReducer(state: SandboxHistory, action: SandboxAction): SandboxHi
         past: [...state.past, state.present],
         present: next,
         future: state.future.slice(1),
+      };
+    }
+
+    case "INIT_TEAM": {
+      // Structural change — not recorded in undo history
+      const cur = state.present;
+      return {
+        ...state,
+        present: { ...cur, rosters: { ...cur.rosters, [action.teamId]: [] } },
       };
     }
 
@@ -251,11 +263,13 @@ function TeamColumn({
   players,
   rosterLimit,
   warningPlayerIds,
+  isVirtual = false,
 }: {
   team: TeamWithPlayers;
   players: Player[];
   rosterLimit: number;
   warningPlayerIds: Set<string>;
+  isVirtual?: boolean;
 }) {
   const { isOver, setNodeRef } = useDroppable({ id: `team:${team.id}` });
   const overLimit = players.length > rosterLimit;
@@ -265,14 +279,15 @@ function TeamColumn({
       ref={setNodeRef}
       className={cn(
         "flex flex-col rounded-xl border-2 bg-white shadow-sm flex-1 min-w-0 transition-colors",
-        isOver ? "border-blue-400 bg-blue-50" : "border-gray-200"
+        isVirtual ? (isOver ? "border-emerald-400 bg-emerald-50" : "border-emerald-300 border-dashed") : (isOver ? "border-blue-400 bg-blue-50" : "border-gray-200")
       )}
     >
       {/* Header */}
-      <div className="flex items-center justify-between rounded-t-xl bg-slate-50 px-3 py-2 border-b border-gray-200">
+      <div className={cn("flex items-center justify-between rounded-t-xl px-3 py-2 border-b", isVirtual ? "bg-emerald-50 border-emerald-200" : "bg-slate-50 border-gray-200")}>
         <div className="flex items-center gap-2 min-w-0">
           <Users className="h-4 w-4 shrink-0 text-slate-500" />
           <span className="font-semibold text-sm text-slate-800 truncate">{team.name}</span>
+          {isVirtual && <Badge variant="outline" className="text-[10px] px-1 py-0 border-emerald-300 text-emerald-600 shrink-0">New</Badge>}
         </div>
         <Badge
           variant="outline"
@@ -775,6 +790,20 @@ export function LineupBuilderClient({ initialTeams, initialUnassigned }: LineupB
     () => new Set(initialTeams.slice(0, 5).map((t) => t.id))
   );
 
+  // Virtual (new) teams — created in sandbox, saved to DB when roster is saved
+  const [virtualTeams, setVirtualTeams] = useState<TeamWithPlayers[]>([]);
+  const allSandboxTeams = useMemo(
+    () => [...initialTeams, ...virtualTeams],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [virtualTeams]
+  );
+
+  // Add virtual team dialog
+  const [addVirtualTeamOpen, setAddVirtualTeamOpen] = useState(false);
+  const [virtualTeamName, setVirtualTeamName] = useState("");
+  const [virtualTeamDivision, setVirtualTeamDivision] = useState("");
+  const [virtualTeamLimit, setVirtualTeamLimit] = useState("16");
+
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -929,8 +958,8 @@ export function LineupBuilderClient({ initialTeams, initialUnassigned }: LineupB
 
   // ── Sandbox warnings ─────────────────────────────────────────────────────────
   const sandboxWarnings = useMemo(() => {
-    return computeRosterWarnings(initialTeams, sim.rosters);
-  }, [initialTeams, sim.rosters]);
+    return computeRosterWarnings(allSandboxTeams, sim.rosters);
+  }, [allSandboxTeams, sim.rosters]);
   const sandboxWarnIds = useMemo(() => new Set(sandboxWarnings.map((w) => w.playerId)), [sandboxWarnings]);
 
   // ── Lineup warnings ───────────────────────────────────────────────────────────
@@ -958,7 +987,7 @@ export function LineupBuilderClient({ initialTeams, initialUnassigned }: LineupB
       let currentTeamName: string | null = null;
       for (const [teamId, players] of Object.entries(sim.rosters)) {
         if (players.some((p) => p.id === player.id)) {
-          const team = initialTeams.find((t) => t.id === teamId);
+          const team = allSandboxTeams.find((t) => t.id === teamId);
           currentTeamName = team?.name ?? null;
           break;
         }
@@ -969,9 +998,35 @@ export function LineupBuilderClient({ initialTeams, initialUnassigned }: LineupB
       }
     }
     return moves;
-  }, [sim, initialTeams]);
+  }, [sim, initialTeams, allSandboxTeams]);
 
   const hasSandboxChanges = sandboxMoves.length > 0;
+
+  // ── Add virtual team ───────────────────────────────────────────────────────────
+  const handleAddVirtualTeam = useCallback(() => {
+    const name = virtualTeamName.trim();
+    if (!name) return;
+    const virtualId = `__new__${Math.random().toString(36).slice(2)}`;
+    const newTeam: TeamWithPlayers = {
+      id: virtualId,
+      name,
+      age_division: virtualTeamDivision.trim() || null,
+      roster_limit: Number(virtualTeamLimit) || 16,
+      tenant_id: "",
+      birth_year: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      players: [],
+    };
+    setVirtualTeams((prev) => [...prev, newTeam]);
+    sandboxDispatch({ type: "INIT_TEAM", teamId: virtualId });
+    // Auto-show the new team; bypass max-5 cap so the user sees what they just created
+    setSandboxVisibleTeamIds((prev) => new Set([...prev, virtualId]));
+    setAddVirtualTeamOpen(false);
+    setVirtualTeamName("");
+    setVirtualTeamDivision("");
+    setVirtualTeamLimit("16");
+  }, [virtualTeamName, virtualTeamDivision, virtualTeamLimit]);
 
   // ── Save roster ───────────────────────────────────────────────────────────────
   const handleSaveRoster = useCallback(async () => {
@@ -980,10 +1035,25 @@ export function LineupBuilderClient({ initialTeams, initialUnassigned }: LineupB
     setSaveError(null);
     setSaveSuccess(false);
     try {
+      // Collect virtual teams that actually have players assigned to them
+      const usedVirtualTeams = virtualTeams.filter((vt) =>
+        sandboxMoves.some((m) => m.team_name === vt.name)
+      );
+      const body: {
+        moves: typeof sandboxMoves;
+        newTeams?: Array<{ name: string; age_division?: string | null; roster_limit?: number }>;
+      } = { moves: sandboxMoves };
+      if (usedVirtualTeams.length > 0) {
+        body.newTeams = usedVirtualTeams.map((t) => ({
+          name: t.name,
+          age_division: t.age_division ?? null,
+          roster_limit: t.roster_limit ?? 16,
+        }));
+      }
       const res = await fetch("/api/app/lineup/save-roster", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ moves: sandboxMoves }),
+        body: JSON.stringify(body),
       });
       if (!res.ok) {
         const j = await res.json();
@@ -996,7 +1066,7 @@ export function LineupBuilderClient({ initialTeams, initialUnassigned }: LineupB
     } finally {
       setSaving(false);
     }
-  }, [hasSandboxChanges, sandboxMoves]);
+  }, [hasSandboxChanges, sandboxMoves, virtualTeams]);
 
   // ── Fetch saved lineups ───────────────────────────────────────────────────────
   const fetchSavedLineups = useCallback(async (teamId: string) => {
@@ -1168,7 +1238,11 @@ export function LineupBuilderClient({ initialTeams, initialUnassigned }: LineupB
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => sandboxDispatch({ type: "RESET", initial: initialSim })}
+                onClick={() => {
+                  sandboxDispatch({ type: "RESET", initial: initialSim });
+                  setVirtualTeams([]);
+                  setSandboxVisibleTeamIds(new Set(initialTeams.slice(0, 5).map((t) => t.id)));
+                }}
                 disabled={saving}
               >
                 <RotateCcw className="h-3.5 w-3.5 mr-1" />
@@ -1204,8 +1278,8 @@ export function LineupBuilderClient({ initialTeams, initialUnassigned }: LineupB
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm">
                     <Users className="h-3.5 w-3.5 mr-1" />
-                    {sandboxVisibleTeamIds.size === initialTeams.length
-                      ? `All ${initialTeams.length} teams`
+                    {sandboxVisibleTeamIds.size === allSandboxTeams.length
+                      ? `All ${allSandboxTeams.length} teams`
                       : `${sandboxVisibleTeamIds.size} team${sandboxVisibleTeamIds.size !== 1 ? "s" : ""} shown`}
                     <ChevronDown className="h-3 w-3 ml-1" />
                   </Button>
@@ -1213,9 +1287,10 @@ export function LineupBuilderClient({ initialTeams, initialUnassigned }: LineupB
                 <DropdownMenuContent align="start" className="w-56" onCloseAutoFocus={(e) => e.preventDefault()}>
                   <DropdownMenuLabel className="text-xs text-gray-500">Show up to 5 teams</DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  {initialTeams.map((team) => {
+                  {allSandboxTeams.map((team) => {
                     const checked = pendingSandboxTeamIds.has(team.id);
                     const atMax = pendingSandboxTeamIds.size >= 5 && !checked;
+                    const isNew = team.id.startsWith("__new__");
                     return (
                       <DropdownMenuItem
                         key={team.id}
@@ -1236,7 +1311,8 @@ export function LineupBuilderClient({ initialTeams, initialUnassigned }: LineupB
                         }`}>
                           {checked && <Check className="h-3 w-3 text-white" />}
                         </div>
-                        <span className="truncate text-sm">{team.name}</span>
+                        <span className="truncate text-sm flex-1">{team.name}</span>
+                        {isNew && <Badge variant="outline" className="text-[10px] px-1 py-0 border-emerald-300 text-emerald-600 shrink-0">New</Badge>}
                       </DropdownMenuItem>
                     );
                   })}
@@ -1249,7 +1325,7 @@ export function LineupBuilderClient({ initialTeams, initialUnassigned }: LineupB
                         variant="ghost"
                         className="h-6 px-2 text-xs"
                         onClick={() => {
-                          const first = initialTeams.slice(0, 1).map((t) => t.id);
+                          const first = allSandboxTeams.slice(0, 1).map((t) => t.id);
                           setPendingSandboxTeamIds(new Set(first));
                         }}
                       >
@@ -1305,7 +1381,7 @@ export function LineupBuilderClient({ initialTeams, initialUnassigned }: LineupB
 
             {/* Teams grid */}
             <div className="flex gap-3 flex-1 overflow-y-auto pb-2">
-              {initialTeams
+              {allSandboxTeams
                 .filter((team) => sandboxVisibleTeamIds.has(team.id))
                 .map((team) => (
                 <TeamColumn
@@ -1314,6 +1390,7 @@ export function LineupBuilderClient({ initialTeams, initialUnassigned }: LineupB
                   players={sim.rosters[team.id] ?? []}
                   rosterLimit={team.roster_limit ?? 16}
                   warningPlayerIds={sandboxWarnIds}
+                  isVirtual={team.id.startsWith("__new__")}
                 />
               ))}
               <UnassignedColumn players={sim.unassigned} warningPlayerIds={sandboxWarnIds} />
@@ -1333,6 +1410,61 @@ export function LineupBuilderClient({ initialTeams, initialUnassigned }: LineupB
           </DragOverlay>
         </DndContext>
       )}
+
+      {/* ── Add Virtual Team dialog ──────────────────────────────────────────── */}
+      <Dialog open={addVirtualTeamOpen} onOpenChange={setAddVirtualTeamOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Plus className="h-5 w-5" /> Add New Team
+            </DialogTitle>
+            <DialogDescription>
+              Create a temporary team in the sandbox. Drag players in, then Save Roster to create it in your club.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="vt-name">Team Name <span className="text-red-500">*</span></Label>
+              <Input
+                id="vt-name"
+                placeholder="e.g. U12 Red"
+                value={virtualTeamName}
+                onChange={(e) => setVirtualTeamName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") handleAddVirtualTeam(); }}
+                autoFocus
+              />
+            </div>
+            <div className="flex gap-3">
+              <div className="flex flex-col gap-1.5 flex-1">
+                <Label htmlFor="vt-div">Age Division</Label>
+                <Input
+                  id="vt-div"
+                  placeholder="e.g. U12"
+                  value={virtualTeamDivision}
+                  onChange={(e) => setVirtualTeamDivision(e.target.value)}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5 w-24">
+                <Label htmlFor="vt-limit">Roster Limit</Label>
+                <Input
+                  id="vt-limit"
+                  type="number"
+                  min={1}
+                  max={50}
+                  value={virtualTeamLimit}
+                  onChange={(e) => setVirtualTeamLimit(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddVirtualTeamOpen(false)}>Cancel</Button>
+            <Button onClick={handleAddVirtualTeam} disabled={!virtualTeamName.trim()}>
+              Add Team
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ── LINEUP BUILDER ────────────────────────────────────────────────────── */}
       {tab === "lineup" && (
