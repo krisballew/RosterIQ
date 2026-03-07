@@ -580,9 +580,36 @@ export async function DELETE(request: NextRequest) {
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   const { supabase, tenantId } = auth;
+  const eventId = request.nextUrl.searchParams.get("eventId")?.trim() ?? "";
   const linkId = request.nextUrl.searchParams.get("linkId")?.trim() ?? "";
 
-  if (!linkId) return NextResponse.json({ error: "linkId is required" }, { status: 400 });
+  if (eventId) {
+    const { data: existing, error: getErr } = await supabase
+      .from("recruitment_events")
+      .select("id")
+      .eq("id", eventId)
+      .eq("tenant_id", tenantId)
+      .single();
+
+    if (getErr || !existing) return NextResponse.json({ error: "Event not found" }, { status: 404 });
+
+    // Delete associated registration links first
+    await supabase
+      .from("recruitment_registration_links")
+      .delete()
+      .eq("event_id", eventId)
+      .eq("tenant_id", tenantId);
+
+    const { error } = await supabase
+      .from("recruitment_events")
+      .delete()
+      .eq("id", eventId);
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ success: true });
+  }
+
+  if (!linkId) return NextResponse.json({ error: "linkId or eventId is required" }, { status: 400 });
 
   // Verify link belongs to tenant
   const { data: existing, error: getErr } = await supabase

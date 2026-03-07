@@ -238,6 +238,20 @@ export function RecruitmentClient() {
   const [editingLinkId, setEditingLinkId] = useState<string | null>(null);
   const [editLinkData, setEditLinkData] = useState({ startsOn: "", endsOn: "" });
 
+  const [editingEventId, setEditingEventId] = useState<string | null>(null);
+  const [editEventData, setEditEventData] = useState({
+    name: "",
+    eventType: "tryout",
+    season: "",
+    gender: "coed",
+    startDate: "",
+    startTime: "",
+    durationMinutes: "90",
+    fieldSpaceId: "",
+    teamId: "",
+    existingLocation: "",
+  });
+
   const [newEval, setNewEval] = useState({
     eventId: "",
     rating: "",
@@ -494,6 +508,55 @@ export function RecruitmentClient() {
     setEditLinkData({ startsOn: "", endsOn: "" });
     await loadData();
     toast("success", "Link updated.");
+  }
+
+  async function updateEvent(eventId: string) {
+    if (!editEventData.name.trim() || !editEventData.startDate || !editEventData.startTime) {
+      return toast("error", "Event name, start date, and start time are required.");
+    }
+    const durationMinutes = Number(editEventData.durationMinutes || "0");
+    if (!Number.isFinite(durationMinutes) || durationMinutes <= 0) {
+      return toast("error", "Duration must be a positive number of minutes.");
+    }
+    const selectedSpace = editEventData.fieldSpaceId
+      ? data.fieldSpaces.find((s) => s.id === editEventData.fieldSpaceId)
+      : null;
+    const locationLabel = selectedSpace
+      ? selectedSpace.complex_name
+        ? `${selectedSpace.complex_name} — ${selectedSpace.name}`
+        : selectedSpace.name
+      : editEventData.existingLocation || null;
+    const startAt = `${editEventData.startDate}T${editEventData.startTime}`;
+    const res = await fetch("/api/app/recruitment", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        entity: "event",
+        eventId,
+        name: editEventData.name,
+        eventType: editEventData.eventType,
+        season: editEventData.season,
+        gender: editEventData.gender,
+        startAt,
+        durationMinutes,
+        location: locationLabel,
+        teamId: editEventData.teamId || null,
+      }),
+    });
+    const json = await res.json();
+    if (!res.ok) return toast("error", json.error ?? "Failed to update event");
+    setEditingEventId(null);
+    await loadData();
+    toast("success", "Event updated.");
+  }
+
+  async function deleteEvent(eventId: string, eventName: string) {
+    if (!confirm(`Delete event "${eventName}" and all its associated registration links? This cannot be undone.`)) return;
+    const res = await fetch(`/api/app/recruitment?eventId=${encodeURIComponent(eventId)}`, { method: "DELETE" });
+    const json = await res.json();
+    if (!res.ok) return toast("error", json.error ?? "Failed to delete event");
+    await loadData();
+    toast("success", "Event and associated registration links deleted.");
   }
 
   async function deleteRegistrationLink(linkId: string) {
@@ -1000,6 +1063,132 @@ export function RecruitmentClient() {
                     </div>
                   </div>
                   <Button size="sm" onClick={() => void createEvent()}><CalendarClock className="h-4 w-4 mr-1" /> Create Event</Button>
+
+                  {data.events.length > 0 && (
+                    <div className="pt-1 space-y-1">
+                      <p className="text-xs font-medium text-gray-600">Existing Events</p>
+                      <div className="max-h-60 overflow-auto space-y-1">
+                        {data.events.map((ev) => (
+                          <div key={ev.id} className="rounded border border-gray-200 p-2 text-xs">
+                            {editingEventId === ev.id ? (
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <p className="font-medium text-gray-700 text-[11px]">Edit Event</p>
+                                  <div className="flex gap-1">
+                                    <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => void updateEvent(ev.id)}><Check className="h-3 w-3" /></Button>
+                                    <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => setEditingEventId(null)}><X className="h-3 w-3" /></Button>
+                                  </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-1.5">
+                                  <div className="space-y-0.5">
+                                    <Label className="text-[10px]">Name</Label>
+                                    <Input className="h-7 text-xs" value={editEventData.name} onChange={(e) => setEditEventData((p) => ({ ...p, name: e.target.value }))} />
+                                  </div>
+                                  <div className="space-y-0.5">
+                                    <Label className="text-[10px]">Type</Label>
+                                    <Select value={editEventData.eventType} onValueChange={(v) => setEditEventData((p) => ({ ...p, eventType: v }))}>
+                                      <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="tryout">Tryout</SelectItem>
+                                        <SelectItem value="open_session">Open Session</SelectItem>
+                                        <SelectItem value="interest_form">Interest Form</SelectItem>
+                                        <SelectItem value="camp">Camp</SelectItem>
+                                        <SelectItem value="other">Other</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                  <div className="space-y-0.5">
+                                    <Label className="text-[10px]">Team</Label>
+                                    <Select value={editEventData.teamId || "none"} onValueChange={(v) => setEditEventData((p) => ({ ...p, teamId: v === "none" ? "" : v }))}>
+                                      <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="No team" /></SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="none">No team</SelectItem>
+                                        {data.teams.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                  <div className="space-y-0.5">
+                                    <Label className="text-[10px]">Gender</Label>
+                                    <Select value={editEventData.gender} onValueChange={(v) => setEditEventData((p) => ({ ...p, gender: v }))}>
+                                      <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="coed">Coed</SelectItem>
+                                        <SelectItem value="boys">Boys</SelectItem>
+                                        <SelectItem value="girls">Girls</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                  <div className="space-y-0.5">
+                                    <Label className="text-[10px]">Location (Field Space)</Label>
+                                    <Select value={editEventData.fieldSpaceId || "none"} onValueChange={(v) => setEditEventData((p) => ({ ...p, fieldSpaceId: v === "none" ? "" : v }))}>
+                                      <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Keep existing" /></SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="none">Keep existing</SelectItem>
+                                        {data.fieldSpaces.map((s) => (
+                                          <SelectItem key={s.id} value={s.id}>{s.complex_name ? `${s.complex_name} \u2014 ` : ""}{s.name}{s.field_type ? ` (${s.field_type})` : ""}</SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                  <div className="space-y-0.5">
+                                    <Label className="text-[10px]">Season</Label>
+                                    <Input className="h-7 text-xs" value={editEventData.season} onChange={(e) => setEditEventData((p) => ({ ...p, season: e.target.value }))} />
+                                  </div>
+                                  <div className="space-y-0.5">
+                                    <Label className="text-[10px]">Start Date</Label>
+                                    <Input type="date" className="h-7 text-xs" value={editEventData.startDate} onChange={(e) => setEditEventData((p) => ({ ...p, startDate: e.target.value }))} />
+                                  </div>
+                                  <div className="space-y-0.5">
+                                    <Label className="text-[10px]">Start Time</Label>
+                                    <Input type="time" className="h-7 text-xs" value={editEventData.startTime} onChange={(e) => setEditEventData((p) => ({ ...p, startTime: e.target.value }))} />
+                                  </div>
+                                  <div className="space-y-0.5">
+                                    <Label className="text-[10px]">Duration (min)</Label>
+                                    <Input type="number" min={15} max={720} step={15} className="h-7 text-xs" value={editEventData.durationMinutes} onChange={(e) => setEditEventData((p) => ({ ...p, durationMinutes: e.target.value }))} />
+                                  </div>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium text-gray-900 truncate">{ev.name}</p>
+                                  <p className="text-gray-500">{ev.event_type.replace("_", " ")} {ev.starts_at ? `• ${new Date(ev.starts_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })} ${new Date(ev.starts_at).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}` : ""}</p>
+                                  {ev.location && <p className="text-gray-400 truncate">{ev.location}</p>}
+                                </div>
+                                <div className="flex gap-1 shrink-0">
+                                  <Button
+                                    size="sm" variant="ghost" className="h-7 w-7 p-0"
+                                    onClick={() => {
+                                      setEditingEventId(ev.id);
+                                      setEditEventData({
+                                        name: ev.name,
+                                        eventType: ev.event_type,
+                                        season: ev.season ?? "",
+                                        gender: ev.gender ?? "coed",
+                                        startDate: ev.starts_at ? ev.starts_at.slice(0, 10) : "",
+                                        startTime: ev.starts_at ? ev.starts_at.slice(11, 16) : "",
+                                        durationMinutes: ev.starts_at && ev.ends_at
+                                          ? String(Math.round((new Date(ev.ends_at).getTime() - new Date(ev.starts_at).getTime()) / 60000))
+                                          : "90",
+                                        fieldSpaceId: "",
+                                        teamId: ev.team_id ?? "",
+                                        existingLocation: ev.location ?? "",
+                                      });
+                                    }}
+                                  >
+                                    <Pencil className="h-3 w-3" />
+                                  </Button>
+                                  <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => void deleteEvent(ev.id, ev.name)}>
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   <div className="border-t border-gray-200 pt-3 grid grid-cols-2 gap-2">
                     <div className="space-y-1">
