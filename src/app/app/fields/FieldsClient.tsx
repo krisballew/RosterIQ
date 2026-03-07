@@ -41,6 +41,8 @@ export function FieldsClient() {
   const [mapName, setMapName] = useState("");
   const [mapFile, setMapFile] = useState<File | null>(null);
   const [creatingMap, setCreatingMap] = useState(false);
+  const [autoExtractLabels, setAutoExtractLabels] = useState(true);
+  const [extractingMapId, setExtractingMapId] = useState<string | null>(null);
 
   const [fieldLabel, setFieldLabel] = useState("");
   const [fieldDescription, setFieldDescription] = useState("");
@@ -113,6 +115,21 @@ export function FieldsClient() {
       const createJson = await createRes.json();
       if (!createRes.ok) throw new Error(createJson.error ?? "Failed to create field map");
 
+      if (autoExtractLabels) {
+        const extractRes = await fetch("/api/app/fields/maps/extract-labels", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            mapId: createJson.fieldMap.id,
+            imageUrl: createJson.fieldMap.image_url,
+          }),
+        });
+        const extractJson = await extractRes.json();
+        if (!extractRes.ok) {
+          throw new Error(extractJson.error ?? "Failed to extract field labels from map");
+        }
+      }
+
       setMapName("");
       setMapFile(null);
       await loadDashboard();
@@ -120,6 +137,25 @@ export function FieldsClient() {
       setError(e instanceof Error ? e.message : "Failed to create map");
     } finally {
       setCreatingMap(false);
+    }
+  }
+
+  async function handleExtractLabelsForMap(mapId: string, imageUrl: string) {
+    setError(null);
+    setExtractingMapId(mapId);
+    try {
+      const res = await fetch("/api/app/fields/maps/extract-labels", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mapId, imageUrl }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Failed to extract labels");
+      await loadDashboard();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to extract labels");
+    } finally {
+      setExtractingMapId(null);
     }
   }
 
@@ -275,6 +311,14 @@ export function FieldsClient() {
             {creatingMap ? "Uploading..." : "Upload Field Map"}
           </Button>
         </div>
+        <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+          <input
+            type="checkbox"
+            checked={autoExtractLabels}
+            onChange={(e) => setAutoExtractLabels(e.target.checked)}
+          />
+          Auto-extract field labels from this image after upload
+        </label>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
           {fieldMaps.map((m) => (
             <div key={m.id} className="rounded-lg border border-gray-200 overflow-hidden">
@@ -282,6 +326,15 @@ export function FieldsClient() {
               <img src={m.image_url} alt={m.name} className="h-32 w-full object-cover" />
               <div className="p-3">
                 <p className="font-medium text-gray-900 text-sm">{m.name}</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-2"
+                  onClick={() => handleExtractLabelsForMap(m.id, m.image_url)}
+                  disabled={extractingMapId === m.id}
+                >
+                  {extractingMapId === m.id ? "Extracting..." : "Extract Labels"}
+                </Button>
               </div>
             </div>
           ))}
