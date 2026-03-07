@@ -163,6 +163,29 @@ function PlayerFormDialog({
       setError("First name and last name are required.");
       return;
     }
+
+    // Age division guard: if a team with an age division is selected, ensure the
+    // player is not too old to play in that division (playing down is not allowed).
+    if (form.date_of_birth && form.team_assigned) {
+      const selectedTeam = teams.find((t) => t.name === form.team_assigned);
+      if (selectedTeam?.age_division) {
+        const playerDiv = computeDivisionForDob(
+          form.date_of_birth,
+          computeAgeDivisions(getSeasonEndYear())
+        );
+        if (playerDiv) {
+          const playerNum = parseInt(playerDiv.slice(1), 10);
+          const teamNum = parseInt(selectedTeam.age_division.slice(1), 10);
+          if (!isNaN(playerNum) && !isNaN(teamNum) && playerNum > teamNum) {
+            setError(
+              `This player is in the ${playerDiv} age division and cannot be placed on ${selectedTeam.name} (${selectedTeam.age_division}). Players may play up to an older division but not down to a younger one.`
+            );
+            return;
+          }
+        }
+      }
+    }
+
     setSaving(true);
     try {
       await onSubmit(form);

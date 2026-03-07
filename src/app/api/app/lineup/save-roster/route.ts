@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
   const playerIds = moves.map((m) => m.player_id);
   const { data: ownedPlayers, error: checkError } = await supabase
     .from("players")
-    .select("id")
+    .select("id, age_division")
     .eq("tenant_id", membership.tenant_id)
     .in("id", playerIds);
 
@@ -74,6 +74,36 @@ export async function POST(request: NextRequest) {
       { error: "Some players do not belong to your tenant", forbidden },
       { status: 403 }
     );
+  }
+
+  // Age division guard: fetch target teams and validate that no player is being
+  // assigned to a division they are too old for (playing down is not allowed).
+  const targetTeamNames = [...new Set(moves.map((m) => m.team_name).filter((n): n is string => n !== null))];
+  if (targetTeamNames.length > 0) {
+    const { data: targetTeams } = await supabase
+      .from("teams")
+      .select("name, age_division")
+      .eq("tenant_id", membership.tenant_id)
+      .in("name", targetTeamNames);
+
+    const teamDivMap = new Map((targetTeams ?? []).map((t) => [t.name, t.age_division as string | null]));
+    const playerDivMap = new Map((ownedPlayers ?? []).map((p) => [p.id, p.age_division as string | null]));
+    const parseU = (div: string) => parseInt(div.slice(1), 10);
+
+    for (const move of moves) {
+      if (!move.team_name) continue;
+      const teamDiv = teamDivMap.get(move.team_name);
+      const playerDiv = playerDivMap.get(move.player_id);
+      if (!teamDiv || !playerDiv) continue;
+      const playerNum = parseU(playerDiv);
+      const teamNum = parseU(teamDiv);
+      if (!isNaN(playerNum) && !isNaN(teamNum) && playerNum > teamNum) {
+        return NextResponse.json(
+          { error: `A ${playerDiv} player cannot be assigned to ${move.team_name} (${teamDiv}). Players may play up but not down.` },
+          { status: 422 }
+        );
+      }
+    }
   }
 
   // Apply moves sequentially (could be parallelised, but sequential avoids rate limits)

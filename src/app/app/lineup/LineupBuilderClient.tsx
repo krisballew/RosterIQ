@@ -820,6 +820,7 @@ export function LineupBuilderClient({ initialTeams, initialUnassigned }: LineupB
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [dragError, setDragError] = useState<string | null>(null);
 
   // ── Lineup builder state ───────────────────────────────────────────────────
   const firstTeamId = initialTeams[0]?.id ?? null;
@@ -912,13 +913,29 @@ export function LineupBuilderClient({ initialTeams, initialUnassigned }: LineupB
       return;
     }
 
+    // Age division guard: prevent assigning a player to a division they're too old for.
+    if (toTeamId !== "unassigned") {
+      const targetTeam = allSandboxTeams.find((t) => t.id === toTeamId);
+      if (targetTeam?.age_division && data.player.age_division) {
+        const playerNum = parseInt(data.player.age_division.slice(1), 10);
+        const teamNum = parseInt(targetTeam.age_division.slice(1), 10);
+        if (!isNaN(playerNum) && !isNaN(teamNum) && playerNum > teamNum) {
+          setDragError(
+            `${data.player.first_name} ${data.player.last_name} is a ${data.player.age_division} player and cannot be assigned to ${targetTeam.name} (${targetTeam.age_division}). Players may play up but not down.`
+          );
+          return;
+        }
+      }
+    }
+
+    setDragError(null);
     sandboxDispatch({
       type: "MOVE_PLAYER",
       playerId: data.player.id,
       fromTeamId,
       toTeamId,
     });
-  }, []);
+  }, [allSandboxTeams]);
 
   // ── Lineup drag end ──────────────────────────────────────────────────────────
   const handleLineupDragEnd = useCallback((event: DragEndEvent) => {
@@ -1406,6 +1423,17 @@ export function LineupBuilderClient({ initialTeams, initialUnassigned }: LineupB
             <div className="shrink-0">
               <WarningsPanel warnings={sandboxWarnings} />
             </div>
+
+            {/* Age division rejection banner */}
+            {dragError && (
+              <div className="shrink-0 flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span className="flex-1">{dragError}</span>
+                <button className="shrink-0 text-red-400 hover:text-red-600" onClick={() => setDragError(null)}>
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            )}
 
             {/* Teams grid */}
             <div className="flex gap-3 flex-1 overflow-y-auto pb-2">
