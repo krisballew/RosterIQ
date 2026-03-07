@@ -135,16 +135,30 @@ export async function GET(request: NextRequest) {
   const isCoach = COACH_ROLES.includes(role as CoachRole);
 
   // For coaches, scope all data to their assigned teams only.
-  // Look up teams via user.id → memberships join so the result is stable
-  // regardless of which membership ID was returned by auth.
+  // Two-step lookup to avoid unreliable PostgREST embedded-resource WHERE filters:
+  //   1. Get all active membership IDs for this user in this tenant.
+  //   2. Find teams where coach_membership_id is one of those IDs.
   let coachTeamIds: string[] | null = null;
   if (isCoach) {
-    const { data: coachTeams } = await supabase
-      .from("teams")
-      .select("id, coach_membership_id, memberships!inner(user_id)")
+    const { data: userMemberships } = await supabase
+      .from("memberships")
+      .select("id")
+      .eq("user_id", auth.user.id)
       .eq("tenant_id", tenantId)
-      .eq("memberships.user_id", auth.user.id);
-    coachTeamIds = (coachTeams ?? []).map((t: { id: string }) => t.id);
+      .eq("is_active", true);
+
+    const membershipIds = (userMemberships ?? []).map((m: { id: string }) => m.id);
+
+    if (membershipIds.length > 0) {
+      const { data: coachTeams } = await supabase
+        .from("teams")
+        .select("id")
+        .eq("tenant_id", tenantId)
+        .in("coach_membership_id", membershipIds);
+      coachTeamIds = (coachTeams ?? []).map((t: { id: string }) => t.id);
+    } else {
+      coachTeamIds = [];
+    }
   }
 
   const q = request.nextUrl.searchParams.get("q")?.trim() ?? "";
