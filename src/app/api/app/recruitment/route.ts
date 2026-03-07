@@ -124,53 +124,12 @@ function parseCsv(csv: string) {
   return rows;
 }
 
-// Management roles have full tenant-wide visibility.
-// Any other role (coaches, or any unrecognized value) is scoped to their assigned teams.
-const MANAGEMENT_ROLES = ["platform_admin", "club_admin", "club_director", "director_of_coaching"] as const;
-const COACH_ROLES = ["select_coach", "academy_coach"] as const;
-type ManagementRole = (typeof MANAGEMENT_ROLES)[number];
-
 export async function GET(request: NextRequest) {
-  const auth = await requireRecruitmentAccess(false);
+  // Management roles only — coaches use /api/app/my-recruitment
+  const auth = await requireRecruitmentAccess(true);
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
-  const { supabase, tenantId, membershipId } = auth;
-
-  // Fetch ALL active memberships for this user in this tenant so we can accurately
-  // determine their access level. Relying solely on auth.role is unsafe because
-  // _auth.ts may pick a management-level membership if the user has more than one,
-  // which would incorrectly grant full visibility.
-  const { data: allMemberships } = await supabase
-    .from("memberships")
-    .select("id, role")
-    .eq("user_id", auth.user.id)
-    .eq("tenant_id", tenantId)
-    .eq("is_active", true);
-
-  const memberships = allMemberships ?? [];
-  const membershipIds = memberships.map((m: { id: string }) => m.id);
-  const membershipRoles = memberships.map((m: { role: string }) => m.role);
-
-  // A user is a manager only if they hold at least one management-level role.
-  const isManager = membershipRoles.some((r) => MANAGEMENT_ROLES.includes(r as ManagementRole));
-
-  // Effective role for the client UI: prefer coach role (most restrictive) if present.
-  const coachRole = membershipRoles.find((r) => COACH_ROLES.includes(r as (typeof COACH_ROLES)[number]));
-  const effectiveRole = coachRole ?? auth.role;
-
-  let coachTeamIds: string[] | null = null;
-  if (!isManager) {
-    if (membershipIds.length > 0) {
-      const { data: coachTeams } = await supabase
-        .from("teams")
-        .select("id")
-        .eq("tenant_id", tenantId)
-        .in("coach_membership_id", membershipIds);
-      coachTeamIds = (coachTeams ?? []).map((t: { id: string }) => t.id);
-    } else {
-      coachTeamIds = [];
-    }
-  }
+  const { supabase, tenantId, role } = auth;
 
   const q = request.nextUrl.searchParams.get("q")?.trim() ?? "";
   const status = request.nextUrl.searchParams.get("status")?.trim() ?? "";
@@ -205,24 +164,15 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // Coaches: scope to their teams; otherwise apply optional team filter normally
-  if (coachTeamIds !== null) {
-    const ids = coachTeamIds.length > 0 ? coachTeamIds : ["00000000-0000-0000-0000-000000000000"];
-    prospectsQuery = prospectsQuery.in("team_id", ids);
-  } else if (teamId) {
+  if (teamId) {
     prospectsQuery = prospectsQuery.eq("team_id", teamId);
   }
 
-  let eventsQuery = supabase
+  const eventsQuery = supabase
     .from("recruitment_events")
     .select("*")
     .eq("tenant_id", tenantId)
     .order("starts_at", { ascending: false });
-
-  if (coachTeamIds !== null) {
-    const ids = coachTeamIds.length > 0 ? coachTeamIds : ["00000000-0000-0000-0000-000000000000"];
-    eventsQuery = eventsQuery.in("team_id", ids);
-  }
 
   const [prospectsRes, eventsRes, linksRes, evalsRes, statusRes, plansRes, teamsRes, fieldSpacesRes] = await Promise.all([
     prospectsQuery,
@@ -230,13 +180,13 @@ export async function GET(request: NextRequest) {
     supabase.from("recruitment_registration_links").select("*").eq("tenant_id", tenantId).order("created_at", { ascending: false }),
     supabase.from("recruitment_evaluations").select("*").eq("tenant_id", tenantId).order("created_at", { ascending: false }),
     supabase.from("recruitment_status_history").select("*").eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(300),
-    !isManager ? Promise.resolve({ data: [] }) : supabase.from("recruitment_plans").select("*").eq("tenant_id", tenantId).order("updated_at", { ascending: false }),
+    supabase.from("recruitment_plans").select("*").eq("tenant_id", tenantId).order("updated_at", { ascending: false }),
     supabase.from("teams").select("id, name, age_division").eq("tenant_id", tenantId).order("name"),
     supabase.from("training_field_spaces").select("id, map_id, name, field_type, availability_status, training_field_maps(training_complexes(name))").eq("tenant_id", tenantId).eq("availability_status", "available").order("name"),
   ]);
 
   return NextResponse.json({
-    role: effectiveRole,
+    role,
     prospects: prospectsRes.data ?? [],
     events: eventsRes.data ?? [],
     links: linksRes.data ?? [],

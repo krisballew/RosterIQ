@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Plus, Upload, Link as LinkIcon, ClipboardCheck, History, UserPlus, Filter, CalendarClock, Pencil, Trash2, X, Check, ChevronDown } from "lucide-react";
+import { Search, Plus, Upload, Link as LinkIcon, ClipboardCheck, UserPlus, Filter, CalendarClock, Pencil, Trash2, X, Check, ChevronDown } from "lucide-react";
 
 type Team = { id: string; name: string; age_division: string | null };
 type FieldSpace = { id: string; map_id: string; name: string; field_type: string | null; availability_status: string; complex_name: string | null };
@@ -225,8 +225,6 @@ export function RecruitmentClient() {
     fieldSpaces: [],
     statuses: [],
   });
-
-  const isCoach = data.role === "select_coach" || data.role === "academy_coach";
 
   const [filters, setFilters] = useState<Filters>(defaultFilters);
   const [selectedProspectId, setSelectedProspectId] = useState("");
@@ -781,8 +779,8 @@ export function RecruitmentClient() {
         <div className="inline-flex rounded-lg border border-gray-200 p-1 bg-white shrink-0">
           {([
             ["pipeline", "Pipeline"],
-            ...(!isCoach ? [["intake", "Intake"]] : []),
-            ...(!isCoach ? [["planning", "Planning"]] : []),
+            ["intake", "Intake"],
+            ["planning", "Planning"],
             ["history", "History"],
           ] as [string, string][]).map(([id, label]) => (
             <button
@@ -926,38 +924,6 @@ export function RecruitmentClient() {
                   {data.prospects.length === 0 && <p className="text-sm text-gray-500 py-2">No prospects match current filters.</p>}
                 </div>
               </CollapsibleSection>
-
-              {/* Coaches see a read-only events list in Pipeline; managers see it under Intake */}
-              {isCoach && (
-                <CollapsibleSection title={`My Team Events${data.events.length > 0 ? ` (${data.events.length})` : ""}`}>
-                  <div className="space-y-1 pt-2">
-                    {data.events.map((ev) => {
-                      const team = data.teams.find((t) => t.id === ev.team_id);
-                      return (
-                        <div key={ev.id} className="rounded border border-gray-200 p-3 text-sm">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <p className="font-medium text-gray-900">{ev.name}</p>
-                              <p className="text-xs text-gray-500 mt-0.5">
-                                {ev.event_type.replace("_", " ")}
-                                {team ? ` • ${team.name}` : ""}
-                                {ev.starts_at
-                                  ? ` • ${new Date(ev.starts_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })} ${new Date(ev.starts_at).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}`
-                                  : ""}
-                              </p>
-                              {ev.location && <p className="text-xs text-gray-400 mt-0.5">{ev.location}</p>}
-                            </div>
-                            {ev.season && <span className="text-xs text-gray-400 shrink-0">{ev.season}</span>}
-                          </div>
-                        </div>
-                      );
-                    })}
-                    {data.events.length === 0 && (
-                      <p className="text-sm text-gray-500 py-2">No events scheduled for your teams yet.</p>
-                    )}
-                  </div>
-                </CollapsibleSection>
-              )}
 
               {selectedProspect && (
                 <CollapsibleSection title={`Workspace — ${selectedProspect.first_name} ${selectedProspect.last_name}`}>

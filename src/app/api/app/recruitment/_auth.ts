@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 
+// All roles that may access the recruitment module at all
 const RECRUITMENT_ROLES = [
   "platform_admin",
   "club_admin",
@@ -7,6 +8,14 @@ const RECRUITMENT_ROLES = [
   "director_of_coaching",
   "select_coach",
   "academy_coach",
+] as const;
+
+// Only management roles may access the full Recruitment CRM
+const MANAGEMENT_ROLES = [
+  "platform_admin",
+  "club_admin",
+  "club_director",
+  "director_of_coaching",
 ] as const;
 
 export async function requireRecruitmentAccess(requireManage = false) {
@@ -25,15 +34,12 @@ export async function requireRecruitmentAccess(requireManage = false) {
     .not("tenant_id", "is", null);
 
   const list = memberships ?? [];
-  // Prefer a recruitment-role membership so role detection is stable
-  const recruitmentMembership = list.find((m) =>
-    RECRUITMENT_ROLES.includes(m.role as (typeof RECRUITMENT_ROLES)[number])
-  );
-  const anyMembership = recruitmentMembership ?? list[0];
-  if (!anyMembership?.tenant_id) return { error: "Forbidden", status: 403 as const };
 
   if (requireManage) {
-    const manageMembership = list.find((m) => RECRUITMENT_ROLES.includes(m.role as (typeof RECRUITMENT_ROLES)[number]));
+    // Must hold at least one management-level role — coaches are not allowed here
+    const manageMembership = list.find((m) =>
+      MANAGEMENT_ROLES.includes(m.role as (typeof MANAGEMENT_ROLES)[number])
+    );
     if (!manageMembership) return { error: "Forbidden", status: 403 as const };
 
     return {
@@ -45,11 +51,23 @@ export async function requireRecruitmentAccess(requireManage = false) {
     };
   }
 
+  // Any recruitment role is acceptable; prefer management > coach
+  const preferredMembership =
+    list.find((m) =>
+      MANAGEMENT_ROLES.includes(m.role as (typeof MANAGEMENT_ROLES)[number])
+    ) ??
+    list.find((m) =>
+      RECRUITMENT_ROLES.includes(m.role as (typeof RECRUITMENT_ROLES)[number])
+    ) ??
+    list[0];
+
+  if (!preferredMembership?.tenant_id) return { error: "Forbidden", status: 403 as const };
+
   return {
     supabase,
     user,
-    tenantId: anyMembership.tenant_id,
-    membershipId: anyMembership.id,
-    role: anyMembership.role,
+    tenantId: preferredMembership.tenant_id,
+    membershipId: preferredMembership.id,
+    role: preferredMembership.role,
   };
 }

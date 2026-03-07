@@ -29,6 +29,15 @@ const navItems = [
   { href: "/app/education", label: "Education", icon: BookOpen },
 ];
 
+const coachNavItems = [
+  { href: "/app/home", label: "Home", icon: LayoutDashboard },
+  { href: "/app/roster", label: "Roster Management", icon: Users },
+  { href: "/app/lineup", label: "Lineup Builder", icon: Layers },
+  { href: "/app/my-recruitment", label: "My Recruitment", icon: Search },
+  { href: "/app/fields", label: "Field Assignments", icon: MapPin },
+  { href: "/app/education", label: "Education", icon: BookOpen },
+];
+
 const playerNavItems = [
   { href: "/app/home", label: "Home", icon: LayoutDashboard },
   { href: "/app/my-reviews", label: "My Reviews", icon: ClipboardList },
@@ -69,9 +78,10 @@ export function Sidebar({
 
   // Determine which nav items to show based on role
   const isPlayer = highestRole && ["select_player", "academy_player"].includes(highestRole);
-  
+  const isCoach = highestRole && ["select_coach", "academy_coach"].includes(highestRole);
+
   const visibleNavItems = isPlayer ? playerNavItems : [
-    ...navItems,
+    ...(isCoach ? coachNavItems : navItems),
     coachAdminReviewItem,
   ];
 
