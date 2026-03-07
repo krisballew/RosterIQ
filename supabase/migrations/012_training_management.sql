@@ -10,6 +10,61 @@ create index if not exists idx_players_membership
   on public.players(membership_id) 
   where membership_id is not null;
 
+-- Create team_players junction table for many-to-many relationship
+-- This enables proper team roster management and training assignments
+create table if not exists public.team_players (
+  id uuid primary key default gen_random_uuid(),
+  team_id uuid not null references public.teams(id) on delete cascade,
+  player_id uuid not null references public.players(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  
+  -- Ensure a player can only be on a team once
+  unique(team_id, player_id)
+);
+
+create index if not exists idx_team_players_team on public.team_players(team_id);
+create index if not exists idx_team_players_player on public.team_players(player_id);
+
+-- Enable RLS on team_players
+alter table public.team_players enable row level security;
+
+-- RLS policies for team_players
+create policy "Platform admins can manage all team_players"
+  on public.team_players for all
+  using (
+    exists (
+      select 1 from public.memberships m
+      where m.user_id = auth.uid()
+        and m.role = 'platform_admin'
+        and m.is_active = true
+    )
+  );
+
+create policy "Tenant members can view their team rosters"
+  on public.team_players for select
+  using (
+    exists (
+      select 1 from public.memberships m
+      join public.teams t on t.tenant_id = m.tenant_id
+      where m.user_id = auth.uid()
+        and t.id = team_players.team_id
+        and m.is_active = true
+    )
+  );
+
+create policy "Club leadership can manage team rosters"
+  on public.team_players for all
+  using (
+    exists (
+      select 1 from public.memberships m
+      join public.teams t on t.tenant_id = m.tenant_id
+      where m.user_id = auth.uid()
+        and t.id = team_players.team_id
+        and m.role in ('club_admin', 'director_of_coaching', 'club_director')
+        and m.is_active = true
+    )
+  );
+
 -- Training Categories (hierarchical organization)
 create table if not exists public.training_categories (
   id uuid primary key default gen_random_uuid(),
