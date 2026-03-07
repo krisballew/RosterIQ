@@ -201,9 +201,7 @@ export function RecruitmentClient() {
     firstName: "",
     lastName: "",
     dateOfBirth: "",
-    ageDivision: "",
     gender: "",
-    teamId: "",
     parentName: "",
     parentEmail: "",
     parentPhone: "",
@@ -211,11 +209,6 @@ export function RecruitmentClient() {
     currentTeam: "",
     primaryPosition: "",
     secondaryPosition: "",
-    gradYear: "",
-    schoolYear: "",
-    recruitingSource: "manual",
-    rosterFitTag: "",
-    notes: "",
   });
 
   const [statusChange, setStatusChange] = useState({ newStatus: "", reason: "" });
@@ -355,12 +348,27 @@ export function RecruitmentClient() {
   }, []);
 
   async function createProspect() {
-    if (!newProspect.firstName.trim() || !newProspect.lastName.trim()) return;
+    if (!newProspect.firstName.trim() || !newProspect.lastName.trim() || !newProspect.dateOfBirth) {
+      return toast("error", "First name, last name, and date of birth are required.");
+    }
 
     const res = await fetch("/api/app/recruitment", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ entity: "prospect", ...newProspect, teamId: newProspect.teamId || null }),
+      body: JSON.stringify({
+        entity: "prospect",
+        firstName: newProspect.firstName,
+        lastName: newProspect.lastName,
+        dateOfBirth: newProspect.dateOfBirth,
+        gender: newProspect.gender,
+        parentName: newProspect.parentName,
+        parentEmail: newProspect.parentEmail,
+        parentPhone: newProspect.parentPhone,
+        currentClub: newProspect.currentClub,
+        currentTeam: newProspect.currentTeam,
+        primaryPosition: newProspect.primaryPosition,
+        secondaryPosition: newProspect.secondaryPosition,
+      }),
     });
     const json = await res.json();
     if (!res.ok) return toast("error", json.error ?? "Failed to create prospect");
@@ -369,9 +377,7 @@ export function RecruitmentClient() {
       firstName: "",
       lastName: "",
       dateOfBirth: "",
-      ageDivision: "",
       gender: "",
-      teamId: "",
       parentName: "",
       parentEmail: "",
       parentPhone: "",
@@ -379,11 +385,6 @@ export function RecruitmentClient() {
       currentTeam: "",
       primaryPosition: "",
       secondaryPosition: "",
-      gradYear: "",
-      schoolYear: "",
-      recruitingSource: "manual",
-      rosterFitTag: "",
-      notes: "",
     });
     await loadData();
     if (json.prospect?.id) setSelectedProspectId(json.prospect.id);
@@ -881,22 +882,8 @@ export function RecruitmentClient() {
                     <Input id="prospect-dob" type="date" value={newProspect.dateOfBirth} onChange={(e) => setNewProspect((prev) => ({ ...prev, dateOfBirth: e.target.value }))} />
                   </div>
                   <div className="space-y-1">
-                    <Label htmlFor="prospect-age-division">Age Division</Label>
-                    <Input id="prospect-age-division" placeholder="Example: U13" value={newProspect.ageDivision} onChange={(e) => setNewProspect((prev) => ({ ...prev, ageDivision: e.target.value }))} />
-                  </div>
-                  <div className="space-y-1">
                     <Label htmlFor="prospect-gender">Gender</Label>
                     <Input id="prospect-gender" placeholder="Example: coed" value={newProspect.gender} onChange={(e) => setNewProspect((prev) => ({ ...prev, gender: e.target.value }))} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="prospect-team">Team</Label>
-                    <Select value={newProspect.teamId || "none"} onValueChange={(v) => setNewProspect((prev) => ({ ...prev, teamId: v === "none" ? "" : v }))}>
-                      <SelectTrigger id="prospect-team"><SelectValue placeholder="Select team" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">No team</SelectItem>
-                        {data.teams.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
                   </div>
                   <div className="space-y-1">
                     <Label htmlFor="prospect-parent-name">Parent/Guardian Name</Label>
@@ -926,26 +913,6 @@ export function RecruitmentClient() {
                     <Label htmlFor="prospect-secondary-position">Secondary Position</Label>
                     <Input id="prospect-secondary-position" placeholder="Example: RW" value={newProspect.secondaryPosition} onChange={(e) => setNewProspect((prev) => ({ ...prev, secondaryPosition: e.target.value }))} />
                   </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="prospect-grad-year">Grad Year</Label>
-                    <Input id="prospect-grad-year" placeholder="Example: 2031" value={newProspect.gradYear} onChange={(e) => setNewProspect((prev) => ({ ...prev, gradYear: e.target.value }))} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="prospect-school-year">School Year</Label>
-                    <Input id="prospect-school-year" placeholder="Example: 7th" value={newProspect.schoolYear} onChange={(e) => setNewProspect((prev) => ({ ...prev, schoolYear: e.target.value }))} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="prospect-source">Recruiting Source</Label>
-                    <Input id="prospect-source" placeholder="Example: source-zeta-33" value={newProspect.recruitingSource} onChange={(e) => setNewProspect((prev) => ({ ...prev, recruitingSource: e.target.value }))} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="prospect-fit-tag">Roster Fit Tag</Label>
-                    <Input id="prospect-fit-tag" placeholder="Example: fit-band-b" value={newProspect.rosterFitTag} onChange={(e) => setNewProspect((prev) => ({ ...prev, rosterFitTag: e.target.value }))} />
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="prospect-notes">Notes</Label>
-                  <Input id="prospect-notes" placeholder="Example: intake-note-r3" value={newProspect.notes} onChange={(e) => setNewProspect((prev) => ({ ...prev, notes: e.target.value }))} />
                 </div>
                 <Button onClick={() => void createProspect()}><Plus className="h-4 w-4 mr-1" /> Add Prospect</Button>
               </div>
