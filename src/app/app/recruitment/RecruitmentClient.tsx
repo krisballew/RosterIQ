@@ -224,9 +224,10 @@ export function RecruitmentClient() {
     eventType: "tryout",
     season: "",
     ageDivision: "",
-    gender: "",
-    startsAt: "",
-    endsAt: "",
+    gender: "coed",
+    startDate: "",
+    startTime: "",
+    durationMinutes: "90",
     location: "",
     teamId: "",
   });
@@ -390,16 +391,48 @@ export function RecruitmentClient() {
   }
 
   async function createEvent() {
-    if (!newEvent.name.trim()) return;
+    if (!newEvent.name.trim() || !newEvent.startDate || !newEvent.startTime) {
+      return toast("error", "Event name, start date, and start time are required.");
+    }
+
+    const durationMinutes = Number(newEvent.durationMinutes || "0");
+    if (!Number.isFinite(durationMinutes) || durationMinutes <= 0) {
+      return toast("error", "Duration must be a positive number of minutes.");
+    }
+
+    const startAt = `${newEvent.startDate}T${newEvent.startTime}`;
+
     const res = await fetch("/api/app/recruitment", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ entity: "event", ...newEvent, teamId: newEvent.teamId || null }),
+      body: JSON.stringify({
+        entity: "event",
+        name: newEvent.name,
+        eventType: newEvent.eventType,
+        season: newEvent.season,
+        ageDivision: newEvent.ageDivision,
+        gender: newEvent.gender,
+        startAt,
+        durationMinutes,
+        location: newEvent.location,
+        teamId: newEvent.teamId || null,
+      }),
     });
     const json = await res.json();
     if (!res.ok) return toast("error", json.error ?? "Failed to create event");
 
-    setNewEvent({ name: "", eventType: "tryout", season: "", ageDivision: "", gender: "", startsAt: "", endsAt: "", location: "", teamId: "" });
+    setNewEvent({
+      name: "",
+      eventType: "tryout",
+      season: "",
+      ageDivision: "",
+      gender: "coed",
+      startDate: "",
+      startTime: "",
+      durationMinutes: "90",
+      location: "",
+      teamId: "",
+    });
     await loadData();
     toast("success", "Recruiting event created.");
   }
@@ -797,10 +830,18 @@ export function RecruitmentClient() {
                     </Select>
                     <Input placeholder="Season" value={newEvent.season} onChange={(e) => setNewEvent((prev) => ({ ...prev, season: e.target.value }))} />
                     <Input placeholder="Age division" value={newEvent.ageDivision} onChange={(e) => setNewEvent((prev) => ({ ...prev, ageDivision: e.target.value }))} />
-                    <Input placeholder="Gender" value={newEvent.gender} onChange={(e) => setNewEvent((prev) => ({ ...prev, gender: e.target.value }))} />
+                    <Select value={newEvent.gender} onValueChange={(v) => setNewEvent((prev) => ({ ...prev, gender: v }))}>
+                      <SelectTrigger><SelectValue placeholder="Gender" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="coed">Coed</SelectItem>
+                        <SelectItem value="boys">Boys</SelectItem>
+                        <SelectItem value="girls">Girls</SelectItem>
+                      </SelectContent>
+                    </Select>
                     <Input placeholder="Location" value={newEvent.location} onChange={(e) => setNewEvent((prev) => ({ ...prev, location: e.target.value }))} />
-                    <Input type="datetime-local" value={newEvent.startsAt} onChange={(e) => setNewEvent((prev) => ({ ...prev, startsAt: e.target.value }))} />
-                    <Input type="datetime-local" value={newEvent.endsAt} onChange={(e) => setNewEvent((prev) => ({ ...prev, endsAt: e.target.value }))} />
+                    <Input type="date" value={newEvent.startDate} onChange={(e) => setNewEvent((prev) => ({ ...prev, startDate: e.target.value }))} />
+                    <Input type="time" value={newEvent.startTime} onChange={(e) => setNewEvent((prev) => ({ ...prev, startTime: e.target.value }))} />
+                    <Input type="number" min={15} max={720} step={15} placeholder="Duration (minutes)" value={newEvent.durationMinutes} onChange={(e) => setNewEvent((prev) => ({ ...prev, durationMinutes: e.target.value }))} />
                   </div>
                   <Button size="sm" onClick={() => void createEvent()}><CalendarClock className="h-4 w-4 mr-1" /> Create Event</Button>
 

@@ -148,18 +148,49 @@ export async function POST(request: NextRequest) {
     const name = String(body.name ?? "").trim();
     if (!name) return NextResponse.json({ error: "Event name is required" }, { status: 400 });
 
+    const eventType = String(body.eventType ?? "tryout").trim();
+    const validTypes = ["tryout", "open_session", "interest_form", "camp", "other"];
+    if (!validTypes.includes(eventType)) {
+      return NextResponse.json({ error: "Invalid event type" }, { status: 400 });
+    }
+
+    const genderRaw = String(body.gender ?? "").trim().toLowerCase();
+    const gender = genderRaw ? ( ["boys", "girls", "coed"].includes(genderRaw) ? genderRaw : null) : null;
+    if (genderRaw && !gender) {
+      return NextResponse.json({ error: "Gender must be boys, girls, or coed" }, { status: 400 });
+    }
+
+    const startAtRaw = String(body.startAt ?? "").trim();
+    const durationMinutes = Number(body.durationMinutes ?? 0);
+    if (!startAtRaw) return NextResponse.json({ error: "startAt is required" }, { status: 400 });
+    if (!Number.isFinite(durationMinutes) || durationMinutes <= 0 || durationMinutes > 24 * 60) {
+      return NextResponse.json({ error: "durationMinutes must be between 1 and 1440" }, { status: 400 });
+    }
+
+    const startsAtDate = new Date(startAtRaw);
+    if (Number.isNaN(startsAtDate.getTime())) {
+      return NextResponse.json({ error: "Invalid startAt value" }, { status: 400 });
+    }
+
+    const endsAtDate = new Date(startsAtDate.getTime() + durationMinutes * 60_000);
+    const startDatePart = startAtRaw.slice(0, 10);
+    const endDatePartLocal = `${endsAtDate.getFullYear()}-${String(endsAtDate.getMonth() + 1).padStart(2, "0")}-${String(endsAtDate.getDate()).padStart(2, "0")}`;
+    if (startDatePart !== endDatePartLocal) {
+      return NextResponse.json({ error: "Events must start and end on the same local day" }, { status: 400 });
+    }
+
     const { data, error } = await supabase
       .from("recruitment_events")
       .insert({
         tenant_id: tenantId,
         team_id: body.teamId ?? null,
         name,
-        event_type: body.eventType ?? "tryout",
+        event_type: eventType,
         season: body.season ?? null,
         age_division: body.ageDivision ?? null,
-        gender: body.gender ?? null,
-        starts_at: body.startsAt ?? null,
-        ends_at: body.endsAt ?? null,
+        gender,
+        starts_at: startsAtDate.toISOString(),
+        ends_at: endsAtDate.toISOString(),
         location: body.location ?? null,
         created_by: membershipId,
       })
