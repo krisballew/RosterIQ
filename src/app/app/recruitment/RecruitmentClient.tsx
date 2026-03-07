@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Plus, Upload, Link as LinkIcon, ClipboardCheck, History, UserPlus, Filter, CalendarClock } from "lucide-react";
+import { Search, Plus, Upload, Link as LinkIcon, ClipboardCheck, History, UserPlus, Filter, CalendarClock, Pencil, Trash2, X, Check } from "lucide-react";
 
 type Team = { id: string; name: string; age_division: string | null };
 
@@ -240,6 +240,9 @@ export function RecruitmentClient() {
     endsOn: "",
   });
 
+  const [editingLinkId, setEditingLinkId] = useState<string | null>(null);
+  const [editLinkData, setEditLinkData] = useState({ startsOn: "", endsOn: "" });
+
   const [newEval, setNewEval] = useState({
     eventId: "",
     rating: "",
@@ -461,6 +464,39 @@ export function RecruitmentClient() {
     setNewLink({ name: "", eventId: "", teamId: "", startsOn: "", endsOn: "" });
     await loadData();
     toast("success", "Registration link created.");
+  }
+
+  async function updateRegistrationLink(linkId: string) {
+    const res = await fetch("/api/app/recruitment", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        entity: "registration_link",
+        linkId,
+        startsOn: editLinkData.startsOn || null,
+        endsOn: editLinkData.endsOn || null,
+      }),
+    });
+    const json = await res.json();
+    if (!res.ok) return toast("error", json.error ?? "Failed to update link");
+
+    setEditingLinkId(null);
+    setEditLinkData({ startsOn: "", endsOn: "" });
+    await loadData();
+    toast("success", "Link updated.");
+  }
+
+  async function deleteRegistrationLink(linkId: string) {
+    if (!confirm("Are you sure you want to delete this registration link?")) return;
+
+    const res = await fetch(`/api/app/recruitment?linkId=${linkId}`, {
+      method: "DELETE",
+    });
+    const json = await res.json();
+    if (!res.ok) return toast("error", json.error ?? "Failed to delete link");
+
+    await loadData();
+    toast("success", "Link deleted.");
   }
 
   async function changeStatus() {
@@ -880,22 +916,103 @@ export function RecruitmentClient() {
 
                   <div className="max-h-44 overflow-auto space-y-1 pt-2">
                     {data.links.map((l) => (
-                      <div key={l.id} className="rounded border border-gray-200 p-2 text-xs flex items-center justify-between gap-2">
-                        <div>
-                          <p className="font-medium text-gray-900">{l.name}</p>
-                          <p className="text-gray-500">/{l.slug}</p>
-                        </div>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => {
-                            const link = `${externalLinkBase}/register/${l.slug}`;
-                            void navigator.clipboard.writeText(link);
-                            toast("success", "Registration link copied.");
-                          }}
-                        >
-                          Copy
-                        </Button>
+                      <div key={l.id} className="rounded border border-gray-200 p-2 text-xs">
+                        {editingLinkId === l.id ? (
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <p className="font-medium text-gray-900">{l.name}</p>
+                              <div className="flex gap-1">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-6 w-6 p-0"
+                                  onClick={() => void updateRegistrationLink(l.id)}
+                                >
+                                  <Check className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-6 w-6 p-0"
+                                  onClick={() => {
+                                    setEditingLinkId(null);
+                                    setEditLinkData({ startsOn: "", endsOn: "" });
+                                  }}
+                                >
+                                  <X className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <Label className="text-[10px]">Active From</Label>
+                                <Input
+                                  type="date"
+                                  className="h-7 text-xs"
+                                  value={editLinkData.startsOn}
+                                  onChange={(e) => setEditLinkData((prev) => ({ ...prev, startsOn: e.target.value }))}
+                                />
+                              </div>
+                              <div>
+                                <Label className="text-[10px]">Active Until</Label>
+                                <Input
+                                  type="date"
+                                  className="h-7 text-xs"
+                                  value={editLinkData.endsOn}
+                                  onChange={(e) => setEditLinkData((prev) => ({ ...prev, endsOn: e.target.value }))}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex-1">
+                              <p className="font-medium text-gray-900">{l.name}</p>
+                              <p className="text-gray-500">/{l.slug}</p>
+                              {(l.starts_on || l.ends_on) && (
+                                <p className="text-gray-500 mt-1">
+                                  {l.starts_on ? new Date(l.starts_on).toLocaleDateString() : "No start"} — {l.ends_on ? new Date(l.ends_on).toLocaleDateString() : "No end"}
+                                </p>
+                              )}
+                            </div>
+                            <div className="flex gap-1">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 px-2"
+                                onClick={() => {
+                                  const link = `${externalLinkBase}/register/${l.slug}`;
+                                  void navigator.clipboard.writeText(link);
+                                  toast("success", "Registration link copied.");
+                                }}
+                              >
+                                Copy
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 w-7 p-0"
+                                onClick={() => {
+                                  setEditingLinkId(l.id);
+                                  setEditLinkData({
+                                    startsOn: l.starts_on || "",
+                                    endsOn: l.ends_on || "",
+                                  });
+                                }}
+                              >
+                                <Pencil className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                onClick={() => void deleteRegistrationLink(l.id)}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ))}
                     {data.links.length === 0 && <p className="text-xs text-gray-500">No registration links yet.</p>}

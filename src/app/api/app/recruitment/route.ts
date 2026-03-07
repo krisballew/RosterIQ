@@ -509,3 +509,71 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({ error: "Unsupported entity" }, { status: 400 });
 }
+
+export async function PATCH(request: NextRequest) {
+  const auth = await requireRecruitmentAccess(true);
+  if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
+
+  const { supabase, tenantId } = auth;
+  const body = await request.json().catch(() => ({}));
+  const entity = String(body.entity ?? "").trim();
+
+  if (entity === "registration_link") {
+    const linkId = String(body.linkId ?? "").trim();
+    if (!linkId) return NextResponse.json({ error: "linkId is required" }, { status: 400 });
+
+    // Verify link belongs to tenant
+    const { data: existing, error: getErr } = await supabase
+      .from("recruitment_registration_links")
+      .select("id")
+      .eq("id", linkId)
+      .eq("tenant_id", tenantId)
+      .single();
+
+    if (getErr || !existing) return NextResponse.json({ error: "Link not found" }, { status: 404 });
+
+    const { data, error } = await supabase
+      .from("recruitment_registration_links")
+      .update({
+        starts_on: body.startsOn ?? null,
+        ends_on: body.endsOn ?? null,
+        is_active: body.isActive ?? true,
+      })
+      .eq("id", linkId)
+      .select("*")
+      .single();
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ link: data });
+  }
+
+  return NextResponse.json({ error: "Unsupported entity" }, { status: 400 });
+}
+
+export async function DELETE(request: NextRequest) {
+  const auth = await requireRecruitmentAccess(true);
+  if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
+
+  const { supabase, tenantId } = auth;
+  const linkId = request.nextUrl.searchParams.get("linkId")?.trim() ?? "";
+
+  if (!linkId) return NextResponse.json({ error: "linkId is required" }, { status: 400 });
+
+  // Verify link belongs to tenant
+  const { data: existing, error: getErr } = await supabase
+    .from("recruitment_registration_links")
+    .select("id")
+    .eq("id", linkId)
+    .eq("tenant_id", tenantId)
+    .single();
+
+  if (getErr || !existing) return NextResponse.json({ error: "Link not found" }, { status: 404 });
+
+  const { error } = await supabase
+    .from("recruitment_registration_links")
+    .delete()
+    .eq("id", linkId);
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ success: true });
+}
