@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Search, Plus, Upload, Link as LinkIcon, ClipboardCheck, History, UserPlus, Filter, CalendarClock, Pencil, Trash2, X, Check } from "lucide-react";
 
 type Team = { id: string; name: string; age_division: string | null };
-type FieldSpace = { id: string; map_id: string; name: string; field_type: string | null; availability_status: string };
+type FieldSpace = { id: string; map_id: string; name: string; field_type: string | null; availability_status: string; complex_name: string | null };
 
 type Prospect = {
   id: string;
@@ -975,7 +975,7 @@ export function RecruitmentClient() {
                           <SelectItem value="none">No location</SelectItem>
                           {data.fieldSpaces.map((s) => (
                             <SelectItem key={s.id} value={s.id}>
-                              {s.name}{s.field_type ? ` (${s.field_type})` : ""}
+                              {s.complex_name ? `${s.complex_name} — ` : ""}{s.name}{s.field_type ? ` (${s.field_type})` : ""}
                             </SelectItem>
                           ))}
                         </SelectContent>

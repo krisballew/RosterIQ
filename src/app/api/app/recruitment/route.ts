@@ -122,7 +122,7 @@ export async function GET(request: NextRequest) {
     supabase.from("recruitment_status_history").select("*").eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(300),
     supabase.from("recruitment_plans").select("*").eq("tenant_id", tenantId).order("updated_at", { ascending: false }),
     supabase.from("teams").select("id, name, age_division").eq("tenant_id", tenantId).order("name"),
-    supabase.from("training_field_spaces").select("id, map_id, name, field_type, availability_status").eq("tenant_id", tenantId).eq("availability_status", "available").order("name"),
+    supabase.from("training_field_spaces").select("id, map_id, name, field_type, availability_status, training_field_maps(training_complexes(name))").eq("tenant_id", tenantId).eq("availability_status", "available").order("name"),
   ]);
 
   return NextResponse.json({
@@ -133,7 +133,14 @@ export async function GET(request: NextRequest) {
     statusHistory: statusRes.data ?? [],
     plans: plansRes.data ?? [],
     teams: teamsRes.data ?? [],
-    fieldSpaces: fieldSpacesRes.data ?? [],
+    fieldSpaces: (fieldSpacesRes.data ?? []).map((s: Record<string, unknown>) => ({
+      id: s.id,
+      map_id: s.map_id,
+      name: s.name,
+      field_type: s.field_type ?? null,
+      availability_status: s.availability_status,
+      complex_name: (s.training_field_maps as { training_complexes?: { name?: string } } | null)?.training_complexes?.name ?? null,
+    })),
     statuses: DEFAULT_STATUSES,
   });
 }
