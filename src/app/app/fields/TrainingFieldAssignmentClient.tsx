@@ -85,6 +85,7 @@ export function TrainingFieldAssignmentClient() {
   const [selectedMapId, setSelectedMapId] = useState<string>("");
   const [selectedSpaceId, setSelectedSpaceId] = useState<string>("");
   const [zoom, setZoom] = useState(1);
+  const [rotatingSpaceId, setRotatingSpaceId] = useState<string | null>(null);
 
   const [complexName, setComplexName] = useState("");
   const [complexFacility, setComplexFacility] = useState("");
@@ -98,6 +99,40 @@ export function TrainingFieldAssignmentClient() {
   const [assignmentTitle, setAssignmentTitle] = useState("");
   const [assignmentStart, setAssignmentStart] = useState("");
   const [assignmentEnd, setAssignmentEnd] = useState("");
+
+  function handleRotateStart(e: React.MouseEvent, spaceId: string) {
+    e.stopPropagation();
+    setRotatingSpaceId(spaceId);
+    
+    const mapContainer = document.getElementById('field-map-container') as HTMLElement;
+      if (!mapContainer) return;
+    
+    const handleRotate = (ev: MouseEvent) => {
+      const space = spaces.find((s) => s.id === spaceId);
+      if (!space || !mapContainer) return;
+      
+      const containerRect = mapContainer.getBoundingClientRect();
+      const centerX = containerRect.left + (space.x + space.width / 2) * zoom;
+      const centerY = containerRect.top + (space.y + space.height / 2) * zoom;
+      const angle = Math.atan2(ev.clientY - centerY, ev.clientX - centerX) * (180 / Math.PI) + 90;
+      const normalizedAngle = ((angle % 360) + 360) % 360;
+      
+      setSpaces((prev) => prev.map((s) => (s.id === spaceId ? { ...s, rotation: normalizedAngle } : s)));
+    };
+    
+    const handleRotateEnd = () => {
+      const space = spaces.find((s) => s.id === spaceId);
+      if (space) {
+        void patchSpace(spaceId, { rotation: space.rotation });
+      }
+      setRotatingSpaceId(null);
+      document.removeEventListener("mousemove", handleRotate);
+      document.removeEventListener("mouseup", handleRotateEnd);
+    };
+    
+    document.addEventListener("mousemove", handleRotate);
+    document.addEventListener("mouseup", handleRotateEnd);
+  }
 
   const selectedMap = maps.find((m) => m.id === selectedMapId) ?? null;
   const selectedSpace = spaces.find((s) => s.id === selectedSpaceId) ?? null;
@@ -425,9 +460,11 @@ export function TrainingFieldAssignmentClient() {
                     {filteredSpaces.map((space) => (
                       <Rnd
                         key={space.id}
+                                                data-space-id={space.id}
                         bounds="parent"
                         position={{ x: Number(space.x), y: Number(space.y) }}
                         size={{ width: Number(space.width), height: Number(space.height) }}
+                                                disableDragging={rotatingSpaceId === space.id}
                         onDragStop={(_, d) => {
                           void patchSpace(space.id, { x: d.x, y: d.y });
                         }}
@@ -439,7 +476,11 @@ export function TrainingFieldAssignmentClient() {
                             y: position.y,
                           });
                         }}
-                        onClick={() => setSelectedSpaceId(space.id)}
+                        onClick={() => {
+                          if (rotatingSpaceId !== space.id) {
+                            setSelectedSpaceId(space.id);
+                          }
+                        }}
                         style={{
                           transform: `rotate(${space.rotation}deg)`,
                           background: occupiedSpaceIds.has(space.id)
@@ -458,6 +499,40 @@ export function TrainingFieldAssignmentClient() {
                         <span className="px-2 py-1 rounded bg-white/85 text-xs font-semibold text-gray-900 pointer-events-none">
                           {space.name}
                         </span>
+                                              {(selectedSpaceId === space.id || rotatingSpaceId === space.id) && (
+                                                <div
+                                                  onMouseDown={(e) => handleRotateStart(e, space.id)}
+                                                  style={{
+                                                    position: "absolute",
+                                                    top: -8,
+                                                    right: -8,
+                                                    width: 20,
+                                                    height: 20,
+                                                    borderRadius: "50%",
+                                                    background: "#2563eb",
+                                                    border: "2px solid white",
+                                                    cursor: "grab",
+                                                    boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
+                                                    zIndex: 30,
+                                                  }}
+                                                  title="Drag to rotate"
+                                                >
+                                                  <svg
+                                                    width="16"
+                                                    height="16"
+                                                    viewBox="0 0 16 16"
+                                                    fill="none"
+                                                    style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)" }}
+                                                  >
+                                                    <path
+                                                      d="M8 2 L8 6 M8 2 L6 4 M8 2 L10 4"
+                                                      stroke="white"
+                                                      strokeWidth="1.5"
+                                                      strokeLinecap="round"
+                                                    />
+                                                  </svg>
+                                                </div>
+                                              )}
                       </Rnd>
                     ))}
                   </div>
@@ -499,11 +574,6 @@ export function TrainingFieldAssignmentClient() {
                               <Label>Border</Label>
                               <Input type="color" value={selectedSpace.border_color} onChange={(e) => { const val = e.target.value; setSpaces((prev) => prev.map((s) => (s.id === selectedSpace.id ? { ...s, border_color: val } : s))); void patchSpace(selectedSpace.id, { borderColor: val }); }} />
                             </div>
-                          </div>
-
-                          <div className="space-y-1">
-                            <Label>Rotation ({Math.round(selectedSpace.rotation)}°)</Label>
-                            <Input type="range" min={0} max={359} value={selectedSpace.rotation} onChange={(e) => { const val = Number(e.target.value); setSpaces((prev) => prev.map((s) => (s.id === selectedSpace.id ? { ...s, rotation: val } : s))); }} onMouseUp={(e) => { const val = Number((e.target as HTMLInputElement).value); void patchSpace(selectedSpace.id, { rotation: val }); }} />
                           </div>
 
                           <Button variant="destructive" size="sm" onClick={() => void handleDeleteSpace(selectedSpace.id)}>
