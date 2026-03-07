@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { RefreshCw, Upload, Plus, Save, Trash2, CalendarClock, MapPinned } from "lucide-react";
+import { RefreshCw, Upload, Plus, Save, Trash2, CalendarClock, MapPinned, Clock3, CalendarDays } from "lucide-react";
 
 type Complex = {
   id: string;
@@ -76,6 +76,11 @@ function toLocalInputValue(iso: string) {
 
 function toDateTimeIso(date: string, time: string) {
   return new Date(`${date}T${time}:00`).toISOString();
+}
+
+function toLocalDateInputValue(date: Date) {
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 10);
 }
 
 function normalizeSlots(input: unknown): TimeSlot[] {
@@ -199,6 +204,25 @@ export function TrainingFieldAssignmentClient() {
     () => assignments.filter((a) => (selectedMapId ? a.map_id === selectedMapId : true)),
     [assignments, selectedMapId]
   );
+
+  const selectedAssignmentSpace = useMemo(
+    () => filteredSpaces.find((s) => s.id === assignmentSpaceId) ?? null,
+    [filteredSpaces, assignmentSpaceId]
+  );
+
+  const assignmentSlots = selectedAssignmentSpace?.available_time_slots ?? [];
+
+  const quickDateOptions = useMemo(() => {
+    const base = new Date();
+    return [0, 1, 2].map((offset) => {
+      const date = new Date(base);
+      date.setDate(base.getDate() + offset);
+      return {
+        value: toLocalDateInputValue(date),
+        label: offset === 0 ? "Today" : offset === 1 ? "Tomorrow" : date.toLocaleDateString(undefined, { weekday: "short" }),
+      };
+    });
+  }, []);
 
   function pushToast(kind: Toast["kind"], message: string) {
     const id = Date.now() + Math.floor(Math.random() * 999);
@@ -781,22 +805,51 @@ export function TrainingFieldAssignmentClient() {
                       <div className="grid grid-cols-2 gap-2">
                         <div className="space-y-1">
                           <Label>Date</Label>
-                          <Input type="date" value={assignmentDate} onChange={(e) => setAssignmentDate(e.target.value)} />
+                          <div className="space-y-2">
+                            <div className="relative">
+                              <CalendarDays className="h-4 w-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                              <Input type="date" value={assignmentDate} onChange={(e) => setAssignmentDate(e.target.value)} className="pl-9 h-10" />
+                            </div>
+                            <div className="flex gap-2">
+                              {quickDateOptions.map((opt) => (
+                                <button
+                                  key={opt.value}
+                                  type="button"
+                                  className={`text-xs rounded-full px-3 py-1 border transition ${assignmentDate === opt.value ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-600 border-gray-200 hover:border-blue-300 hover:text-blue-700"}`}
+                                  onClick={() => setAssignmentDate(opt.value)}
+                                >
+                                  {opt.label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
                         </div>
                         <div className="space-y-1">
                           <Label>Time Slot</Label>
-                          <Select value={assignmentSlotId || "none"} onValueChange={(v) => setAssignmentSlotId(v === "none" ? "" : v)}>
-                            <SelectTrigger><SelectValue placeholder="Select slot" /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="none">Select slot</SelectItem>
-                              {(filteredSpaces.find((s) => s.id === assignmentSpaceId)?.available_time_slots ?? []).map((slot) => (
-                                <SelectItem key={slot.id} value={slot.id}>{slot.name} ({slot.startTime} - {slot.endTime})</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <div className="rounded-md border border-gray-200 p-2 bg-gray-50/60 min-h-10">
+                            {assignmentSlots.length > 0 ? (
+                              <div className="grid grid-cols-1 gap-2 max-h-28 overflow-auto pr-1">
+                                {assignmentSlots.map((slot) => (
+                                  <button
+                                    key={slot.id}
+                                    type="button"
+                                    onClick={() => setAssignmentSlotId(slot.id)}
+                                    className={`text-left rounded-md border px-2 py-1.5 transition ${assignmentSlotId === slot.id ? "border-blue-500 bg-blue-50 ring-1 ring-blue-200" : "border-gray-200 bg-white hover:border-blue-300"}`}
+                                  >
+                                    <div className="text-xs font-semibold text-gray-900 flex items-center gap-1">
+                                      <Clock3 className="h-3.5 w-3.5 text-blue-600" /> {slot.name}
+                                    </div>
+                                    <div className="text-xs text-gray-500">{slot.startTime} - {slot.endTime}</div>
+                                  </button>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-xs text-gray-500">Select a field with available slots.</p>
+                            )}
+                          </div>
                         </div>
                       </div>
-                      {assignmentSpaceId && (filteredSpaces.find((s) => s.id === assignmentSpaceId)?.available_time_slots ?? []).length === 0 && (
+                      {assignmentSpaceId && assignmentSlots.length === 0 && (
                         <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
                           This field space has no time slots. Define slots in Setup Mode first.
                         </p>
