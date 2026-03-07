@@ -24,6 +24,13 @@ type FieldMap = {
   canvas_height: number;
 };
 
+type TimeSlot = {
+  id: string;
+  name: string;
+  startTime: string;
+  endTime: string;
+};
+
 type FieldSpace = {
   id: string;
   map_id: string;
@@ -41,6 +48,7 @@ type FieldSpace = {
   fill_color: string;
   border_color: string;
   border_style: "solid" | "dashed" | "dotted";
+  available_time_slots?: TimeSlot[];
 };
 
 type Assignment = {
@@ -66,8 +74,23 @@ function toLocalInputValue(iso: string) {
   return local.toISOString().slice(0, 16);
 }
 
-function fromLocalInputValue(v: string) {
-  return new Date(v).toISOString();
+function toDateTimeIso(date: string, time: string) {
+  return new Date(`${date}T${time}:00`).toISOString();
+}
+
+function normalizeSlots(input: unknown): TimeSlot[] {
+  if (!Array.isArray(input)) return [];
+  return input
+    .map((slot) => {
+      const raw = slot as Partial<TimeSlot>;
+      const id = String(raw.id ?? "").trim();
+      const name = String(raw.name ?? "").trim();
+      const startTime = String(raw.startTime ?? "").trim();
+      const endTime = String(raw.endTime ?? "").trim();
+      if (!id || !name || !startTime || !endTime) return null;
+      return { id, name, startTime, endTime };
+    })
+    .filter((slot): slot is TimeSlot => slot !== null);
 }
 
 async function getImageDimensions(file: File): Promise<{ width: number; height: number }> {
@@ -115,8 +138,12 @@ export function TrainingFieldAssignmentClient() {
   const [assignmentSpaceId, setAssignmentSpaceId] = useState("");
   const [assignmentTeamId, setAssignmentTeamId] = useState("");
   const [assignmentTitle, setAssignmentTitle] = useState("");
-  const [assignmentStart, setAssignmentStart] = useState("");
-  const [assignmentEnd, setAssignmentEnd] = useState("");
+  const [assignmentDate, setAssignmentDate] = useState("");
+  const [assignmentSlotId, setAssignmentSlotId] = useState("");
+
+  const [slotName, setSlotName] = useState("");
+  const [slotStartTime, setSlotStartTime] = useState("");
+  const [slotEndTime, setSlotEndTime] = useState("");
 
   const spacesRef = useRef<FieldSpace[]>([]);
 
@@ -187,7 +214,17 @@ export function TrainingFieldAssignmentClient() {
 
     setComplexes(json.complexes ?? []);
     setMaps(json.maps ?? []);
-    setSpaces((json.spaces ?? []).map((s: FieldSpace) => ({ ...s, x: Number(s.x), y: Number(s.y), width: Number(s.width), height: Number(s.height), rotation: Number(s.rotation) })));
+    setSpaces(
+      (json.spaces ?? []).map((s: FieldSpace) => ({
+        ...s,
+        x: Number(s.x),
+        y: Number(s.y),
+        width: Number(s.width),
+        height: Number(s.height),
+        rotation: Number(s.rotation),
+        available_time_slots: normalizeSlots((s as FieldSpace & { available_time_slots?: unknown }).available_time_slots),
+      }))
+    );
     setAssignments(json.assignments ?? []);
     setTeams(json.teams ?? []);
   }
@@ -310,8 +347,55 @@ export function TrainingFieldAssignmentClient() {
     pushToast("success", "Field space deleted.");
   }
 
+  async function handleAddTimeSlot() {
+    if (!selectedSpace) return;
+
+    const name = slotName.trim();
+    if (!name || !slotStartTime || !slotEndTime) {
+      pushToast("error", "Slot name, start time, and end time are required.");
+      return;
+    }
+
+    if (slotStartTime >= slotEndTime) {
+      pushToast("error", "Slot start time must be before end time.");
+      return;
+    }
+
+    const nextSlots = [
+      ...(selectedSpace.available_time_slots ?? []),
+      { id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, name, startTime: slotStartTime, endTime: slotEndTime },
+    ];
+
+    setSpaces((prev) => prev.map((s) => (s.id === selectedSpace.id ? { ...s, available_time_slots: nextSlots } : s)));
+    await patchSpace(selectedSpace.id, { availableSlots: nextSlots });
+
+    setSlotName("");
+    setSlotStartTime("");
+    setSlotEndTime("");
+    pushToast("success", "Time slot added.");
+  }
+
+  async function handleDeleteTimeSlot(spaceId: string, slotId: string) {
+    const space = spaces.find((s) => s.id === spaceId);
+    if (!space) return;
+
+    const nextSlots = (space.available_time_slots ?? []).filter((slot) => slot.id !== slotId);
+    setSpaces((prev) => prev.map((s) => (s.id === spaceId ? { ...s, available_time_slots: nextSlots } : s)));
+    await patchSpace(spaceId, { availableSlots: nextSlots });
+    if (assignmentSlotId === slotId) setAssignmentSlotId("");
+    pushToast("success", "Time slot removed.");
+  }
+
   async function handleCreateAssignment() {
-    if (!selectedMapId || !assignmentSpaceId || !assignmentTitle.trim() || !assignmentStart || !assignmentEnd) return;
+    const assignmentSpace = filteredSpaces.find((s) => s.id === assignmentSpaceId);
+    const selectedSlot = (assignmentSpace?.available_time_slots ?? []).find((slot) => slot.id === assignmentSlotId);
+
+    if (!selectedMapId || !assignmentSpaceId || !assignmentTitle.trim() || !assignmentDate || !selectedSlot) {
+      return;
+    }
+
+    const startAt = toDateTimeIso(assignmentDate, selectedSlot.startTime);
+    const endAt = toDateTimeIso(assignmentDate, selectedSlot.endTime);
 
     const res = await fetch("/api/app/training-fields/assignments", {
       method: "POST",
@@ -319,16 +403,18 @@ export function TrainingFieldAssignmentClient() {
       body: JSON.stringify({
         mapId: selectedMapId,
         fieldSpaceId: assignmentSpaceId,
+        slotId: selectedSlot.id,
         teamId: assignmentTeamId || null,
         title: assignmentTitle.trim(),
-        startAt: fromLocalInputValue(assignmentStart),
-        endAt: fromLocalInputValue(assignmentEnd),
+        startAt,
+        endAt,
       }),
     });
     const json = await res.json();
     if (!res.ok) return pushToast("error", json.error ?? "Failed to create assignment");
 
     setAssignmentTitle("");
+    setAssignmentSlotId("");
     await loadData(selectedMapId);
     pushToast("success", "Assignment created.");
   }
@@ -342,15 +428,18 @@ export function TrainingFieldAssignmentClient() {
   }
 
   const occupiedSpaceIds = useMemo(() => {
-    if (!assignmentStart || !assignmentEnd) return new Set<string>();
-    const start = fromLocalInputValue(assignmentStart);
-    const end = fromLocalInputValue(assignmentEnd);
+    const assignmentSpace = filteredSpaces.find((s) => s.id === assignmentSpaceId);
+    const selectedSlot = (assignmentSpace?.available_time_slots ?? []).find((slot) => slot.id === assignmentSlotId);
+    if (!assignmentDate || !selectedSlot) return new Set<string>();
+
+    const start = toDateTimeIso(assignmentDate, selectedSlot.startTime);
+    const end = toDateTimeIso(assignmentDate, selectedSlot.endTime);
     return new Set(
       mapAssignments
         .filter((a) => new Date(start) < new Date(a.end_at) && new Date(end) > new Date(a.start_at) && a.status !== "cancelled")
         .map((a) => a.field_space_id)
     );
-  }, [assignmentStart, assignmentEnd, mapAssignments]);
+  }, [assignmentDate, assignmentSlotId, assignmentSpaceId, filteredSpaces, mapAssignments]);
 
   return (
     <div className="max-w-350 mx-auto space-y-4">
@@ -616,6 +705,40 @@ export function TrainingFieldAssignmentClient() {
                             </div>
                           </div>
 
+                          <div className="space-y-2 rounded-md border border-gray-200 p-2">
+                            <Label className="text-xs uppercase tracking-wide text-gray-500">Available Time Slots</Label>
+                            <div className="grid grid-cols-1 gap-2">
+                              {(selectedSpace.available_time_slots ?? []).map((slot) => (
+                                <div key={slot.id} className="flex items-center justify-between rounded border border-gray-200 px-2 py-1 text-sm">
+                                  <span>{slot.name} ({slot.startTime} - {slot.endTime})</span>
+                                  <Button size="sm" variant="ghost" onClick={() => void handleDeleteTimeSlot(selectedSpace.id, slot.id)}>
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              ))}
+                              {(selectedSpace.available_time_slots ?? []).length === 0 && (
+                                <p className="text-xs text-gray-500">No slots defined yet. Add at least one slot to schedule assignments.</p>
+                              )}
+                            </div>
+                            <div className="grid grid-cols-4 gap-2 items-end">
+                              <div className="col-span-2 space-y-1">
+                                <Label className="text-xs">Slot Name</Label>
+                                <Input value={slotName} onChange={(e) => setSlotName(e.target.value)} placeholder="After School" />
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-xs">Start</Label>
+                                <Input type="time" value={slotStartTime} onChange={(e) => setSlotStartTime(e.target.value)} />
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-xs">End</Label>
+                                <Input type="time" value={slotEndTime} onChange={(e) => setSlotEndTime(e.target.value)} />
+                              </div>
+                            </div>
+                            <Button size="sm" onClick={() => void handleAddTimeSlot()} disabled={!slotName.trim() || !slotStartTime || !slotEndTime}>
+                              <Plus className="h-4 w-4 mr-1" /> Add Slot
+                            </Button>
+                          </div>
+
                           <Button variant="destructive" size="sm" onClick={() => void handleDeleteSpace(selectedSpace.id)}>
                             <Trash2 className="h-4 w-4 mr-1" /> Delete Space
                           </Button>
@@ -629,7 +752,11 @@ export function TrainingFieldAssignmentClient() {
                       <h3 className="font-semibold text-sm">Assignment Mode</h3>
                       <div className="space-y-1">
                         <Label>Field Space</Label>
-                        <Select value={assignmentSpaceId || "none"} onValueChange={(v) => setAssignmentSpaceId(v === "none" ? "" : v)}>
+                        <Select value={assignmentSpaceId || "none"} onValueChange={(v) => {
+                          const nextSpaceId = v === "none" ? "" : v;
+                          setAssignmentSpaceId(nextSpaceId);
+                          setAssignmentSlotId("");
+                        }}>
                           <SelectTrigger><SelectValue placeholder="Select space" /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="none">Select space</SelectItem>
@@ -653,15 +780,28 @@ export function TrainingFieldAssignmentClient() {
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         <div className="space-y-1">
-                          <Label>Start</Label>
-                          <Input type="datetime-local" value={assignmentStart} onChange={(e) => setAssignmentStart(e.target.value)} />
+                          <Label>Date</Label>
+                          <Input type="date" value={assignmentDate} onChange={(e) => setAssignmentDate(e.target.value)} />
                         </div>
                         <div className="space-y-1">
-                          <Label>End</Label>
-                          <Input type="datetime-local" value={assignmentEnd} onChange={(e) => setAssignmentEnd(e.target.value)} />
+                          <Label>Time Slot</Label>
+                          <Select value={assignmentSlotId || "none"} onValueChange={(v) => setAssignmentSlotId(v === "none" ? "" : v)}>
+                            <SelectTrigger><SelectValue placeholder="Select slot" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">Select slot</SelectItem>
+                              {(filteredSpaces.find((s) => s.id === assignmentSpaceId)?.available_time_slots ?? []).map((slot) => (
+                                <SelectItem key={slot.id} value={slot.id}>{slot.name} ({slot.startTime} - {slot.endTime})</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </div>
                       </div>
-                      <Button onClick={handleCreateAssignment} disabled={!assignmentSpaceId || !assignmentTitle.trim() || !assignmentStart || !assignmentEnd}>
+                      {assignmentSpaceId && (filteredSpaces.find((s) => s.id === assignmentSpaceId)?.available_time_slots ?? []).length === 0 && (
+                        <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                          This field space has no time slots. Define slots in Setup Mode first.
+                        </p>
+                      )}
+                      <Button onClick={handleCreateAssignment} disabled={!assignmentSpaceId || !assignmentTitle.trim() || !assignmentDate || !assignmentSlotId}>
                         <Save className="h-4 w-4 mr-1" /> Save Assignment
                       </Button>
                     </>

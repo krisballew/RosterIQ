@@ -3,6 +3,37 @@ import { requireTrainingFieldAccess } from "../_auth";
 
 export const runtime = "nodejs";
 
+type TimeSlot = {
+  id: string;
+  name: string;
+  startTime: string;
+  endTime: string;
+};
+
+function isValidTime(value: unknown) {
+  return typeof value === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+}
+
+function normalizeSlots(input: unknown): TimeSlot[] {
+  if (!Array.isArray(input)) return [];
+
+  return input
+    .map((slot) => {
+      const raw = slot as Partial<TimeSlot>;
+      const id = String(raw.id ?? "").trim();
+      const name = String(raw.name ?? "").trim();
+      const startTime = String(raw.startTime ?? "").trim();
+      const endTime = String(raw.endTime ?? "").trim();
+
+      if (!id || !name || !isValidTime(startTime) || !isValidTime(endTime) || startTime >= endTime) {
+        return null;
+      }
+
+      return { id, name, startTime, endTime };
+    })
+    .filter((slot): slot is TimeSlot => slot !== null);
+}
+
 export async function POST(request: NextRequest) {
   const auth = await requireTrainingFieldAccess(true);
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
@@ -35,6 +66,7 @@ export async function POST(request: NextRequest) {
       fill_color: body.fillColor ?? "rgba(34, 197, 94, 0.15)",
       border_color: body.borderColor ?? "#16a34a",
       border_style: body.borderStyle ?? "solid",
+      available_time_slots: normalizeSlots(body.availableSlots),
       created_by: membershipId,
     })
     .select("*")
@@ -68,6 +100,7 @@ export async function PATCH(request: NextRequest) {
   if ("fillColor" in body) updates.fill_color = body.fillColor;
   if ("borderColor" in body) updates.border_color = body.borderColor;
   if ("borderStyle" in body) updates.border_style = body.borderStyle;
+  if ("availableSlots" in body) updates.available_time_slots = normalizeSlots(body.availableSlots);
 
   const { data, error } = await supabase
     .from("training_field_spaces")

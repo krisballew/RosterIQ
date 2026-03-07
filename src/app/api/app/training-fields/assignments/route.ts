@@ -3,6 +3,13 @@ import { requireTrainingFieldAccess } from "../_auth";
 
 export const runtime = "nodejs";
 
+type TimeSlot = {
+  id: string;
+  name: string;
+  startTime: string;
+  endTime: string;
+};
+
 function overlaps(aStart: string, aEnd: string, bStart: string, bEnd: string) {
   return new Date(aStart) < new Date(bEnd) && new Date(aEnd) > new Date(bStart);
 }
@@ -16,12 +23,33 @@ export async function POST(request: NextRequest) {
 
   const mapId = String(body.mapId ?? "").trim();
   const fieldSpaceId = String(body.fieldSpaceId ?? "").trim();
+  const slotId = String(body.slotId ?? "").trim();
   const title = String(body.title ?? "").trim();
   const startAt = String(body.startAt ?? "").trim();
   const endAt = String(body.endAt ?? "").trim();
 
-  if (!mapId || !fieldSpaceId || !title || !startAt || !endAt) {
-    return NextResponse.json({ error: "mapId, fieldSpaceId, title, startAt, endAt are required" }, { status: 400 });
+  if (!mapId || !fieldSpaceId || !slotId || !title || !startAt || !endAt) {
+    return NextResponse.json({ error: "mapId, fieldSpaceId, slotId, title, startAt, endAt are required" }, { status: 400 });
+  }
+
+  const { data: fieldSpace, error: fieldSpaceError } = await supabase
+    .from("training_field_spaces")
+    .select("id, available_time_slots")
+    .eq("tenant_id", tenantId)
+    .eq("id", fieldSpaceId)
+    .single();
+
+  if (fieldSpaceError || !fieldSpace) {
+    return NextResponse.json({ error: fieldSpaceError?.message ?? "Field space not found" }, { status: 404 });
+  }
+
+  const slots = Array.isArray(fieldSpace.available_time_slots)
+    ? (fieldSpace.available_time_slots as TimeSlot[])
+    : [];
+
+  const selectedSlot = slots.find((slot) => slot.id === slotId);
+  if (!selectedSlot) {
+    return NextResponse.json({ error: "Selected time slot is not available for this field space." }, { status: 400 });
   }
 
   const { data: existing } = await supabase
