@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { Sidebar } from "@/components/shell/Sidebar";
-import { Header } from "@/components/shell/Header";
+import { AppShell } from "@/components/shell/AppShell";
 import { getHighestRole, getRoleLabel, isPlatformAdmin } from "@/lib/roles";
 
 export default async function AppLayout({
@@ -75,17 +74,18 @@ export default async function AppLayout({
   const currentTenant = tenantList.find((t) => t.id === firstTenantId) ?? tenantList[0] ?? null;
 
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-50">
-      <Sidebar isPlatformAdmin={isAdmin} isClubAdmin={isClubAdmin} pendingRequestsCount={pendingRequestsCount} currentTenant={currentTenant} highestRole={highestRole} />
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <Header
-          profile={profile}
-          highestRoleLabel={highestRoleLabel}
-          tenants={tenantList}
-          currentTenantId={tenantList[0]?.id ?? null}
-        />
-        <main className="flex-1 overflow-y-auto p-6">{children}</main>
-      </div>
-    </div>
+    <AppShell
+      isPlatformAdmin={isAdmin}
+      isClubAdmin={isClubAdmin}
+      pendingRequestsCount={pendingRequestsCount}
+      currentTenant={currentTenant}
+      highestRole={highestRole}
+      profile={profile}
+      highestRoleLabel={highestRoleLabel}
+      tenants={tenantList}
+      currentTenantId={tenantList[0]?.id ?? null}
+    >
+      {children}
+    </AppShell>
   );
 }

@@ -68,14 +68,6 @@ export default async function RosterPage() {
     const profilesMap = new Map(
       (profilesRes.data ?? []).map((p: any) => [p.user_id, { first_name: p.first_name, last_name: p.last_name }])
     );
-    
-    // Debug logging
-    console.log("Memberships data:", membershipsRes.data);
-    console.log("Memberships error:", membershipsRes.error);
-    console.log("Profiles count:", profilesRes.data?.length ?? 0);
-    console.log("Users count:", users.length);
-    console.log("Tenant ID:", membership.tenant_id);
-    
     playerMemberships = (membershipsRes.data ?? []).map((m: any) => {
       const profile = profilesMap.get(m.user_id);
       return {
@@ -90,8 +82,6 @@ export default async function RosterPage() {
       const bName = `${b.last_name ?? ""} ${b.first_name ?? ""}`.trim();
       return aName.localeCompare(bName);
     });
-    
-    console.log("Final playerMemberships:", playerMemberships);
   }
 
   return <RosterClient initialPlayers={players} initialTeams={teams} playerMemberships={playerMemberships} />;

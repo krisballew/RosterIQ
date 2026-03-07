@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
-import { LogOut, ChevronDown } from "lucide-react";
+import { LogOut, ChevronDown, Menu } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -21,6 +21,7 @@ interface HeaderProps {
   highestRoleLabel: string;
   tenants: Tenant[];
   currentTenantId: string | null;
+  onMobileMenuToggle?: () => void;
 }
 
 export function Header({
@@ -28,6 +29,7 @@ export function Header({
   highestRoleLabel,
   tenants,
   currentTenantId,
+  onMobileMenuToggle,
 }: HeaderProps) {
   const router = useRouter();
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -80,15 +82,26 @@ export function Header({
   }
 
   return (
-    <header className="flex h-16 items-center justify-between border-b border-gray-200 bg-white px-6">
-      {/* Left: Tenant Selector + Date/Time */}
-      <div className="flex items-center gap-4">
+    <header className="flex h-14 md:h-16 items-center justify-between border-b border-gray-200 bg-white px-3 md:px-6">
+      {/* Left: Mobile menu + Tenant Selector + Date/Time */}
+      <div className="flex items-center gap-2 md:gap-4">
+        {/* Mobile menu button */}
+        <button
+          onClick={onMobileMenuToggle}
+          className="lg:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors"
+          aria-label="Open menu"
+        >
+          <Menu className="h-5 w-5 text-gray-600" />
+        </button>
+        
         {tenants.length > 1 && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
-                {selectedTenant?.name ?? "Select Tenant"}
-                <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
+              <button className="flex items-center gap-1.5 md:gap-2 rounded-lg border border-gray-200 px-2 md:px-3 py-1.5 text-xs md:text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                <span className="truncate max-w-25 md:max-w-none">
+                  {selectedTenant?.name ?? "Select Tenant"}
+                </span>
+                <ChevronDown className="h-3 md:h-3.5 w-3 md:w-3.5 text-gray-400 shrink-0" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start">
@@ -109,7 +122,7 @@ export function Header({
           </DropdownMenu>
         )}
 
-        <span className="text-sm text-gray-500 font-mono tabular-nums">
+        <span className="hidden md:inline-block text-xs md:text-sm text-gray-500 font-mono tabular-nums">
           {formattedTime}
         </span>
       </div>
@@ -117,20 +130,20 @@ export function Header({
       {/* Right: User Menu */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button className="flex items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-gray-50 transition-colors">
-            <Avatar className="h-8 w-8">
+          <button className="flex items-center gap-2 md:gap-3 rounded-lg px-1 md:px-2 py-1.5 hover:bg-gray-50 transition-colors">
+            <Avatar className="h-7 w-7 md:h-8 md:w-8">
               {profile?.avatar_url && (
                 <AvatarImage src={profile.avatar_url} alt={fullName} />
               )}
-              <AvatarFallback>{initials}</AvatarFallback>
+              <AvatarFallback className="text-xs md:text-sm">{initials}</AvatarFallback>
             </Avatar>
-            <div className="text-left hidden sm:block">
+            <div className="text-left hidden md:block">
               <p className="text-sm font-medium text-gray-900 leading-none">
                 {fullName || "Unknown User"}
               </p>
               <p className="text-xs text-gray-500 mt-0.5">{highestRoleLabel}</p>
             </div>
-            <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
+            <ChevronDown className="h-3 w-3 md:h-3.5 md:w-3.5 text-gray-400" />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-52">

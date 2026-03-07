@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -13,6 +14,7 @@ import {
   UserCheck,
   UserCog,
   Layers,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Tenant } from "@/types/database";
@@ -41,10 +43,28 @@ interface SidebarProps {
   pendingRequestsCount?: number;
   currentTenant?: Tenant | null;
   highestRole?: Role | null;
+  isMobileOpen?: boolean;
+  onMobileClose?: () => void;
 }
 
-export function Sidebar({ isPlatformAdmin, isClubAdmin = false, pendingRequestsCount = 0, currentTenant, highestRole }: SidebarProps) {
+export function Sidebar({ 
+  isPlatformAdmin, 
+  isClubAdmin = false, 
+  pendingRequestsCount = 0, 
+  currentTenant, 
+  highestRole,
+  isMobileOpen = false,
+  onMobileClose 
+}: SidebarProps) {
   const pathname = usePathname();
+
+  // Close mobile menu when route changes
+  useEffect(() => {
+    if (isMobileOpen && onMobileClose) {
+      onMobileClose();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
 
   // Determine which nav items to show based on role
   const isPlayer = highestRole && ["select_player", "academy_player"].includes(highestRole);
@@ -55,49 +75,71 @@ export function Sidebar({ isPlatformAdmin, isClubAdmin = false, pendingRequestsC
   ];
 
   return (
-    <aside className="flex h-full w-64 flex-col bg-white">
-      {/* Logo */}
-      <div className="flex h-16 items-center px-6">
-        <div className="flex items-center gap-2 min-w-0">
-          {currentTenant?.logo_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={currentTenant.logo_url}
-              alt={currentTenant.name}
-              className="h-8 w-8 rounded-lg object-contain flex-shrink-0"
-            />
-          ) : (
-            <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-blue-600">
-              <span className="text-sm font-bold text-white">
-                {currentTenant ? currentTenant.name[0].toUpperCase() : "R"}
-              </span>
-            </div>
-          )}
-          <span className="text-base font-bold text-gray-900 truncate">
-            {currentTenant ? currentTenant.name : "RosterIQ"}
-          </span>
+    <>
+      {/* Mobile overlay */}
+      {isMobileOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={onMobileClose}
+        />
+      )}
+      
+      {/* Sidebar */}
+      <aside className={cn(
+        "fixed lg:static inset-y-0 left-0 z-50 flex h-full w-64 flex-col bg-white transition-transform duration-300 ease-in-out lg:translate-x-0 border-r border-gray-200",
+        isMobileOpen ? "translate-x-0" : "-translate-x-full"
+      )}>
+        {/* Logo */}
+        <div className="flex h-16 items-center justify-between px-4 lg:px-6">
+          <div className="flex items-center gap-2 min-w-0">
+            {currentTenant?.logo_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={currentTenant.logo_url}
+                alt={currentTenant.name}
+                className="h-8 w-8 rounded-lg object-contain shrink-0"
+              />
+            ) : (
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-600">
+                <span className="text-sm font-bold text-white">
+                  {currentTenant ? currentTenant.name[0].toUpperCase() : "R"}
+                </span>
+              </div>
+            )}
+            <span className="text-base font-bold text-gray-900 truncate">
+              {currentTenant ? currentTenant.name : "RosterIQ"}
+            </span>
+          </div>
+          
+          {/* Close button for mobile */}
+          <button
+            onClick={onMobileClose}
+            className="lg:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors"
+            aria-label="Close menu"
+          >
+            <X className="h-5 w-5 text-gray-500" />
+          </button>
         </div>
-      </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto px-3 py-4">
-        <ul className="space-y-1">
-          {visibleNavItems.map((item) => {
-            const Icon = item.icon;
-            const isActive =
-              pathname === item.href || pathname.startsWith(item.href + "/");
-            return (
-              <li key={item.href}>
-                <Link
-                  href={item.href}
-                  className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                    isActive
-                      ? "bg-blue-50 text-blue-700"
-                      : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-                  )}
-                >
-                  <Icon
+        {/* Navigation */}
+        <nav className="flex-1 overflow-y-auto px-3 py-4">
+          <ul className="space-y-1">
+            {visibleNavItems.map((item) => {
+              const Icon = item.icon;
+              const isActive =
+                pathname === item.href || pathname.startsWith(item.href + "/");
+              return (
+                <li key={item.href}>
+                  <Link
+                    href={item.href}
+                    className={cn(
+                      "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                      isActive
+                        ? "bg-blue-50 text-blue-700"
+                        : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                    )}
+                  >
+                    <Icon
                     className={cn(
                       "h-4 w-4 shrink-0",
                       isActive ? "text-blue-600" : "text-gray-400"
@@ -204,5 +246,6 @@ export function Sidebar({ isPlatformAdmin, isClubAdmin = false, pendingRequestsC
         <p className="text-xs text-gray-400 text-center">© 2026 RosterIQ</p>
       </div>
     </aside>
+    </>
   );
 }
