@@ -70,6 +70,24 @@ function fromLocalInputValue(v: string) {
   return new Date(v).toISOString();
 }
 
+async function getImageDimensions(file: File): Promise<{ width: number; height: number }> {
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const dims = await new Promise<{ width: number; height: number }>((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        resolve({ width: img.naturalWidth, height: img.naturalHeight });
+      };
+      img.onerror = () => reject(new Error("Unable to read image dimensions"));
+      img.src = objectUrl;
+    });
+
+    return dims;
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
 export function TrainingFieldAssignmentClient() {
   const [mode, setMode] = useState<Mode>("setup");
   const [loading, setLoading] = useState(true);
@@ -210,6 +228,8 @@ export function TrainingFieldAssignmentClient() {
     if (!mapName.trim() || !mapFile || !mapComplexId) return;
     setSaving(true);
     try {
+      const { width, height } = await getImageDimensions(mapFile);
+
       const fd = new FormData();
       fd.append("file", mapFile);
       const uploadRes = await fetch("/api/app/training-fields/upload-map", { method: "POST", body: fd });
@@ -224,8 +244,8 @@ export function TrainingFieldAssignmentClient() {
           complexId: mapComplexId,
           name: mapName.trim(),
           backgroundImageUrl: uploadJson.imageUrl,
-          canvasWidth: 1200,
-          canvasHeight: 800,
+          canvasWidth: width,
+          canvasHeight: height,
         }),
       });
       const mapJson = await mapRes.json();
@@ -462,7 +482,7 @@ export function TrainingFieldAssignmentClient() {
                     <img
                       src={selectedMap.background_image_url}
                       alt={selectedMap.name}
-                      className="absolute inset-0 h-full w-full object-cover pointer-events-none"
+                      className="absolute inset-0 h-full w-full object-contain pointer-events-none"
                       draggable={false}
                     />
 
