@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { RefreshCw, Upload, Plus, Save, Trash2, CalendarClock, MapPinned, Clock3, CalendarDays } from "lucide-react";
+import { RefreshCw, Upload, Plus, Save, Trash2, CalendarClock, MapPinned, Clock3, CalendarDays, CircleCheckBig, CircleAlert } from "lucide-react";
 
 type Complex = {
   id: string;
@@ -210,7 +210,10 @@ export function TrainingFieldAssignmentClient() {
     [filteredSpaces, assignmentSpaceId]
   );
 
-  const assignmentSlots = selectedAssignmentSpace?.available_time_slots ?? [];
+  const assignmentSlots = useMemo(
+    () => selectedAssignmentSpace?.available_time_slots ?? [],
+    [selectedAssignmentSpace]
+  );
 
   const quickDateOptions = useMemo(() => {
     const base = new Date();
@@ -223,6 +226,27 @@ export function TrainingFieldAssignmentClient() {
       };
     });
   }, []);
+
+  const conflictingSlotIds = useMemo(() => {
+    if (!assignmentDate || !assignmentSpaceId) return new Set<string>();
+    return new Set(
+      assignmentSlots
+        .filter((slot) => {
+          const slotStart = toDateTimeIso(assignmentDate, slot.startTime);
+          const slotEnd = toDateTimeIso(assignmentDate, slot.endTime);
+          return mapAssignments.some(
+            (a) =>
+              a.field_space_id === assignmentSpaceId &&
+              a.status !== "cancelled" &&
+              new Date(slotStart) < new Date(a.end_at) &&
+              new Date(slotEnd) > new Date(a.start_at)
+          );
+        })
+        .map((slot) => slot.id)
+    );
+  }, [assignmentDate, assignmentSpaceId, assignmentSlots, mapAssignments]);
+
+  const selectedSlotHasConflict = assignmentSlotId ? conflictingSlotIds.has(assignmentSlotId) : false;
 
   function pushToast(kind: Toast["kind"], message: string) {
     const id = Date.now() + Math.floor(Math.random() * 999);
@@ -415,6 +439,11 @@ export function TrainingFieldAssignmentClient() {
     const selectedSlot = (assignmentSpace?.available_time_slots ?? []).find((slot) => slot.id === assignmentSlotId);
 
     if (!selectedMapId || !assignmentSpaceId || !assignmentTitle.trim() || !assignmentDate || !selectedSlot) {
+      return;
+    }
+
+    if (conflictingSlotIds.has(selectedSlot.id)) {
+      pushToast("error", "Selected slot is already occupied for this date.");
       return;
     }
 
@@ -829,19 +858,38 @@ export function TrainingFieldAssignmentClient() {
                           <div className="rounded-md border border-gray-200 p-2 bg-gray-50/60 min-h-10">
                             {assignmentSlots.length > 0 ? (
                               <div className="grid grid-cols-1 gap-2 max-h-28 overflow-auto pr-1">
-                                {assignmentSlots.map((slot) => (
-                                  <button
-                                    key={slot.id}
-                                    type="button"
-                                    onClick={() => setAssignmentSlotId(slot.id)}
-                                    className={`text-left rounded-md border px-2 py-1.5 transition ${assignmentSlotId === slot.id ? "border-blue-500 bg-blue-50 ring-1 ring-blue-200" : "border-gray-200 bg-white hover:border-blue-300"}`}
-                                  >
-                                    <div className="text-xs font-semibold text-gray-900 flex items-center gap-1">
-                                      <Clock3 className="h-3.5 w-3.5 text-blue-600" /> {slot.name}
-                                    </div>
-                                    <div className="text-xs text-gray-500">{slot.startTime} - {slot.endTime}</div>
-                                  </button>
-                                ))}
+                                {assignmentSlots.map((slot) => {
+                                  const isSelected = assignmentSlotId === slot.id;
+                                  const isConflicting = conflictingSlotIds.has(slot.id);
+                                  const slotClass = isSelected
+                                    ? isConflicting
+                                      ? "border-red-500 bg-red-50 ring-1 ring-red-200"
+                                      : "border-blue-500 bg-blue-50 ring-1 ring-blue-200"
+                                    : isConflicting
+                                      ? "border-red-200 bg-red-50/70 hover:border-red-300"
+                                      : "border-emerald-200 bg-emerald-50/70 hover:border-emerald-300";
+
+                                  return (
+                                    <button
+                                      key={slot.id}
+                                      type="button"
+                                      onClick={() => {
+                                        if (!isConflicting) setAssignmentSlotId(slot.id);
+                                      }}
+                                      className={`text-left rounded-md border px-2 py-1.5 transition ${slotClass} ${isConflicting ? "opacity-80" : ""}`}
+                                      disabled={isConflicting}
+                                    >
+                                      <div className="text-xs font-semibold text-gray-900 flex items-center gap-1">
+                                        <Clock3 className="h-3.5 w-3.5 text-blue-600" /> {slot.name}
+                                      </div>
+                                      <div className="text-xs text-gray-500">{slot.startTime} - {slot.endTime}</div>
+                                      <div className={`mt-1 inline-flex items-center gap-1 text-[11px] ${isConflicting ? "text-red-700" : "text-emerald-700"}`}>
+                                        {isConflicting ? <CircleAlert className="h-3 w-3" /> : <CircleCheckBig className="h-3 w-3" />}
+                                        {isConflicting ? "Conflicting" : "Available"}
+                                      </div>
+                                    </button>
+                                  );
+                                })}
                               </div>
                             ) : (
                               <p className="text-xs text-gray-500">Select a field with available slots.</p>
@@ -854,7 +902,12 @@ export function TrainingFieldAssignmentClient() {
                           This field space has no time slots. Define slots in Setup Mode first.
                         </p>
                       )}
-                      <Button onClick={handleCreateAssignment} disabled={!assignmentSpaceId || !assignmentTitle.trim() || !assignmentDate || !assignmentSlotId}>
+                      {selectedSlotHasConflict && (
+                        <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded px-2 py-1">
+                          Selected slot is conflicting on this date. Pick an available slot.
+                        </p>
+                      )}
+                      <Button onClick={handleCreateAssignment} disabled={!assignmentSpaceId || !assignmentTitle.trim() || !assignmentDate || !assignmentSlotId || selectedSlotHasConflict}>
                         <Save className="h-4 w-4 mr-1" /> Save Assignment
                       </Button>
                     </>
