@@ -12,7 +12,7 @@ export async function GET(
 
   const { data: link, error } = await admin
     .from("recruitment_registration_links")
-    .select("id, name, season, age_division, gender, team_id, event_id, starts_on, ends_on, is_active")
+    .select("id, name, season, age_division, gender, team_id, event_id, starts_on, ends_on, is_active, tenant_id")
     .eq("slug", slug)
     .single();
 
@@ -24,7 +24,31 @@ export async function GET(
     return NextResponse.json({ error: "Registration link is outside active dates" }, { status: 410 });
   }
 
-  return NextResponse.json({ link });
+  // Fetch tenant information
+  const { data: tenant } = await admin
+    .from("tenants")
+    .select("id, name, logo_url")
+    .eq("id", link.tenant_id)
+    .single();
+
+  // Fetch event information if linked
+  let event = null;
+  if (link.event_id) {
+    const { data: eventData } = await admin
+      .from("recruitment_events")
+      .select("id, name, event_type, starts_at, ends_at, location")
+      .eq("id", link.event_id)
+      .single();
+    event = eventData;
+  }
+
+  return NextResponse.json({ 
+    link: {
+      ...link,
+      tenant,
+      event,
+    }
+  });
 }
 
 export async function POST(

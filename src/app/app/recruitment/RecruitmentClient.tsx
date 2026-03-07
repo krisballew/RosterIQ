@@ -235,9 +235,6 @@ export function RecruitmentClient() {
   const [newLink, setNewLink] = useState({
     name: "",
     eventId: "",
-    season: "",
-    ageDivision: "",
-    gender: "",
     teamId: "",
     startsOn: "",
     endsOn: "",
@@ -439,15 +436,29 @@ export function RecruitmentClient() {
 
   async function createRegistrationLink() {
     if (!newLink.name.trim()) return;
+    
+    const selectedEvent = data.events.find((e) => e.id === newLink.eventId);
+    const payload = {
+      entity: "registration_link",
+      name: newLink.name,
+      eventId: newLink.eventId || null,
+      season: selectedEvent?.season ?? null,
+      ageDivision: selectedEvent?.age_division ?? null,
+      gender: selectedEvent?.gender ?? null,
+      teamId: newLink.teamId || null,
+      startsOn: newLink.startsOn || null,
+      endsOn: newLink.endsOn || null,
+    };
+    
     const res = await fetch("/api/app/recruitment", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ entity: "registration_link", ...newLink, teamId: newLink.teamId || null, eventId: newLink.eventId || null }),
+      body: JSON.stringify(payload),
     });
     const json = await res.json();
     if (!res.ok) return toast("error", json.error ?? "Failed to create link");
 
-    setNewLink({ name: "", eventId: "", season: "", ageDivision: "", gender: "", teamId: "", startsOn: "", endsOn: "" });
+    setNewLink({ name: "", eventId: "", teamId: "", startsOn: "", endsOn: "" });
     await loadData();
     toast("success", "Registration link created.");
   }
@@ -848,15 +859,12 @@ export function RecruitmentClient() {
                   <div className="border-t border-gray-200 pt-3 grid grid-cols-2 gap-2">
                     <Input placeholder="Link name" value={newLink.name} onChange={(e) => setNewLink((prev) => ({ ...prev, name: e.target.value }))} />
                     <Select value={newLink.eventId || "none"} onValueChange={(v) => setNewLink((prev) => ({ ...prev, eventId: v === "none" ? "" : v }))}>
-                      <SelectTrigger><SelectValue placeholder="Attach event (optional)" /></SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder="Select event" /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="none">No event</SelectItem>
                         {data.events.map((e) => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
-                    <Input placeholder="Season" value={newLink.season} onChange={(e) => setNewLink((prev) => ({ ...prev, season: e.target.value }))} />
-                    <Input placeholder="Age division" value={newLink.ageDivision} onChange={(e) => setNewLink((prev) => ({ ...prev, ageDivision: e.target.value }))} />
-                    <Input placeholder="Gender" value={newLink.gender} onChange={(e) => setNewLink((prev) => ({ ...prev, gender: e.target.value }))} />
                     <Select value={newLink.teamId || "none"} onValueChange={(v) => setNewLink((prev) => ({ ...prev, teamId: v === "none" ? "" : v }))}>
                       <SelectTrigger><SelectValue placeholder="Team (optional)" /></SelectTrigger>
                       <SelectContent>
@@ -864,8 +872,9 @@ export function RecruitmentClient() {
                         {data.teams.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
-                    <Input type="date" value={newLink.startsOn} onChange={(e) => setNewLink((prev) => ({ ...prev, startsOn: e.target.value }))} />
-                    <Input type="date" value={newLink.endsOn} onChange={(e) => setNewLink((prev) => ({ ...prev, endsOn: e.target.value }))} />
+                    <div />
+                    <Input type="date" placeholder="Active from date" value={newLink.startsOn} onChange={(e) => setNewLink((prev) => ({ ...prev, startsOn: e.target.value }))} />
+                    <Input type="date" placeholder="Active until date" value={newLink.endsOn} onChange={(e) => setNewLink((prev) => ({ ...prev, endsOn: e.target.value }))} />
                   </div>
                   <Button size="sm" variant="outline" onClick={() => void createRegistrationLink()}><LinkIcon className="h-4 w-4 mr-1" /> Create Public Link</Button>
 
@@ -880,7 +889,7 @@ export function RecruitmentClient() {
                           size="sm"
                           variant="ghost"
                           onClick={() => {
-                            const link = `${externalLinkBase}/api/public/recruitment/register/${l.slug}`;
+                            const link = `${externalLinkBase}/register/${l.slug}`;
                             void navigator.clipboard.writeText(link);
                             toast("success", "Registration link copied.");
                           }}
