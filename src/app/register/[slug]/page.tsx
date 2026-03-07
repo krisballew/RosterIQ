@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { computeDivisionForDob, parseDivisionNumber } from "@/lib/age-division";
 
 type LinkData = {
   id: string;
@@ -28,6 +29,11 @@ type LinkData = {
     ends_at: string | null;
     location: string | null;
   } | null;
+  team: {
+    id: string;
+    name: string;
+    age_division: string | null;
+  } | null;
 };
 
 export default function RegisterPage() {
@@ -44,7 +50,6 @@ export default function RegisterPage() {
     firstName: "",
     lastName: "",
     dateOfBirth: "",
-    ageDivision: "",
     gender: "",
     parentName: "",
     parentEmail: "",
@@ -53,10 +58,39 @@ export default function RegisterPage() {
     currentTeam: "",
     primaryPosition: "",
     secondaryPosition: "",
-    gradYear: "",
-    schoolYear: "",
-    notes: "",
+    allowPlayUpOverride: false,
   });
+
+  const teamAgeDivision = linkData?.team?.age_division ?? linkData?.age_division ?? null;
+  const teamDivisionNum = parseDivisionNumber(teamAgeDivision);
+  const playerDivision = form.dateOfBirth ? computeDivisionForDob(form.dateOfBirth) : null;
+  const playerDivisionNum = parseDivisionNumber(playerDivision);
+
+  const dobDivisionValidation = (() => {
+    if (!form.dateOfBirth || !teamAgeDivision || playerDivisionNum === null || teamDivisionNum === null) {
+      return null;
+    }
+
+    if (playerDivisionNum > teamDivisionNum) {
+      return {
+        type: "play-down" as const,
+        message:
+          `Based on date of birth, this player is ${playerDivision}. This registration is for ${teamAgeDivision}. ` +
+          "Players cannot play down an age group. Please visit the club website for the correct age-division sign-up link.",
+      };
+    }
+
+    if (playerDivisionNum < teamDivisionNum) {
+      return {
+        type: "play-up" as const,
+        message:
+          `Based on date of birth, this player is ${playerDivision}, but this registration is for ${teamAgeDivision}. ` +
+          "Playing up is allowed with manual override confirmation.",
+      };
+    }
+
+    return null;
+  })();
 
   useEffect(() => {
     async function loadLink() {
@@ -80,8 +114,18 @@ export default function RegisterPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.firstName.trim() || !form.lastName.trim()) {
-      setError("First and last name are required");
+    if (!form.firstName.trim() || !form.lastName.trim() || !form.dateOfBirth) {
+      setError("First name, last name, and date of birth are required");
+      return;
+    }
+
+    if (dobDivisionValidation?.type === "play-down") {
+      setError(dobDivisionValidation.message);
+      return;
+    }
+
+    if (dobDivisionValidation?.type === "play-up" && !form.allowPlayUpOverride) {
+      setError("Please confirm play-up override to continue this registration.");
       return;
     }
     
@@ -92,7 +136,20 @@ export default function RegisterPage() {
       const res = await fetch(`/api/public/recruitment/register/${slug}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          firstName: form.firstName,
+          lastName: form.lastName,
+          dateOfBirth: form.dateOfBirth,
+          gender: form.gender,
+          primaryPosition: form.primaryPosition,
+          secondaryPosition: form.secondaryPosition,
+          currentClub: form.currentClub,
+          currentTeam: form.currentTeam,
+          parentName: form.parentName,
+          parentEmail: form.parentEmail,
+          parentPhone: form.parentPhone,
+          allowPlayUpOverride: form.allowPlayUpOverride,
+        }),
       });
       
       if (!res.ok) {
@@ -217,28 +274,7 @@ export default function RegisterPage() {
                   type="date"
                   value={form.dateOfBirth}
                   onChange={(e) => setForm({ ...form, dateOfBirth: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label htmlFor="gradYear">Graduation Year</Label>
-                <Input 
-                  id="gradYear"
-                  type="number"
-                  placeholder="2026"
-                  value={form.gradYear}
-                  onChange={(e) => setForm({ ...form, gradYear: e.target.value })}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="ageDivision">Age Division</Label>
-                <Input 
-                  id="ageDivision"
-                  placeholder="U12, U14, etc."
-                  value={form.ageDivision}
-                  onChange={(e) => setForm({ ...form, ageDivision: e.target.value })}
+                  required
                 />
               </div>
               <div>
@@ -255,6 +291,33 @@ export default function RegisterPage() {
                 </Select>
               </div>
             </div>
+
+            {dobDivisionValidation && (
+              <div
+                className={`rounded-md border p-3 text-sm ${
+                  dobDivisionValidation.type === "play-down"
+                    ? "bg-red-50 border-red-200 text-red-700"
+                    : "bg-amber-50 border-amber-200 text-amber-800"
+                }`}
+              >
+                <p>{dobDivisionValidation.message}</p>
+                {dobDivisionValidation.type === "play-up" && (
+                  <label className="mt-3 flex items-start gap-2">
+                    <input
+                      type="checkbox"
+                      checked={form.allowPlayUpOverride}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          allowPlayUpOverride: e.target.checked,
+                        })
+                      }
+                    />
+                    <span>I confirm this player is intentionally playing up an age group.</span>
+                  </label>
+                )}
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -326,17 +389,6 @@ export default function RegisterPage() {
                   onChange={(e) => setForm({ ...form, parentPhone: e.target.value })}
                 />
               </div>
-            </div>
-
-            <div>
-              <Label htmlFor="notes">Additional Notes</Label>
-              <textarea
-                id="notes"
-                className="w-full min-h-20 rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                value={form.notes}
-                onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                placeholder="Any additional information you'd like to share..."
-              />
             </div>
 
             <div className="pt-4">

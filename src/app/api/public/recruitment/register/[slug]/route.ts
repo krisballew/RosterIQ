@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { computeDivisionForDob, parseDivisionNumber } from "@/lib/age-division";
 
 export const runtime = "nodejs";
 
@@ -42,11 +43,23 @@ export async function GET(
     event = eventData;
   }
 
+  // Fetch team information if linked
+  let team = null;
+  if (link.team_id) {
+    const { data: teamData } = await admin
+      .from("teams")
+      .select("id, name, age_division")
+      .eq("id", link.team_id)
+      .single();
+    team = teamData;
+  }
+
   return NextResponse.json({ 
     link: {
       ...link,
       tenant,
       event,
+      team,
     }
   });
 }
@@ -61,9 +74,11 @@ export async function POST(
 
   const firstName = String(body.firstName ?? "").trim();
   const lastName = String(body.lastName ?? "").trim();
+  const dateOfBirth = String(body.dateOfBirth ?? "").trim();
+  const allowPlayUpOverride = Boolean(body.allowPlayUpOverride);
 
-  if (!firstName || !lastName) {
-    return NextResponse.json({ error: "First and last name are required" }, { status: 400 });
+  if (!firstName || !lastName || !dateOfBirth) {
+    return NextResponse.json({ error: "First name, last name, and date of birth are required" }, { status: 400 });
   }
 
   const { data: link, error: linkErr } = await admin
@@ -80,6 +95,57 @@ export async function POST(
     return NextResponse.json({ error: "Registration link is outside active dates" }, { status: 410 });
   }
 
+  let teamAgeDivision = link.age_division;
+  let teamName = link.age_division ?? "this team";
+  if (link.team_id) {
+    const { data: team } = await admin
+      .from("teams")
+      .select("name, age_division")
+      .eq("id", link.team_id)
+      .single();
+
+    if (team?.age_division) teamAgeDivision = team.age_division;
+    if (team?.name) teamName = team.name;
+  }
+
+  const playerDivision = computeDivisionForDob(dateOfBirth);
+  const playerDivisionNum = parseDivisionNumber(playerDivision);
+  const teamDivisionNum = parseDivisionNumber(teamAgeDivision);
+
+  if (playerDivisionNum !== null && teamDivisionNum !== null) {
+    if (playerDivisionNum > teamDivisionNum) {
+      return NextResponse.json(
+        {
+          error:
+            `Based on date of birth, this player is ${playerDivision}. ` +
+            `${teamName} is ${teamAgeDivision}. Players cannot play down an age group. ` +
+            "Please visit the club website for the correct age-division sign-up link.",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (playerDivisionNum < teamDivisionNum && !allowPlayUpOverride) {
+      return NextResponse.json(
+        {
+          error:
+            `Based on date of birth, this player is ${playerDivision} and this registration is for ${teamAgeDivision}. ` +
+            "Playing up is allowed only with override confirmation.",
+        },
+        { status: 400 }
+      );
+    }
+  }
+
+  const gender = String(body.gender ?? "").trim();
+  const parentName = String(body.parentName ?? "").trim();
+  const parentEmail = String(body.parentEmail ?? "").trim();
+  const parentPhone = String(body.parentPhone ?? "").trim();
+  const currentClub = String(body.currentClub ?? "").trim();
+  const currentTeam = String(body.currentTeam ?? "").trim();
+  const primaryPosition = String(body.primaryPosition ?? "").trim();
+  const secondaryPosition = String(body.secondaryPosition ?? "").trim();
+
   const { data: prospect, error: createErr } = await admin
     .from("recruitment_prospects")
     .insert({
@@ -89,20 +155,20 @@ export async function POST(
       team_id: link.team_id,
       first_name: firstName,
       last_name: lastName,
-      date_of_birth: body.dateOfBirth ?? null,
-      age_division: body.ageDivision ?? link.age_division ?? null,
-      gender: body.gender ?? link.gender ?? null,
-      parent_name: body.parentName ?? null,
-      parent_email: body.parentEmail ?? null,
-      parent_phone: body.parentPhone ?? null,
-      current_club: body.currentClub ?? null,
-      current_team: body.currentTeam ?? null,
-      primary_position: body.primaryPosition ?? null,
-      secondary_position: body.secondaryPosition ?? null,
-      grad_year: body.gradYear ?? null,
-      school_year: body.schoolYear ?? null,
+      date_of_birth: dateOfBirth,
+      age_division: playerDivision ?? teamAgeDivision ?? null,
+      gender: gender || link.gender || null,
+      parent_name: parentName || null,
+      parent_email: parentEmail || null,
+      parent_phone: parentPhone || null,
+      current_club: currentClub || null,
+      current_team: currentTeam || null,
+      primary_position: primaryPosition || null,
+      secondary_position: secondaryPosition || null,
+      grad_year: null,
+      school_year: null,
       recruiting_source: "public_registration",
-      notes: body.notes ?? null,
+      notes: null,
       status: "Registered",
       created_by: null,
     })
