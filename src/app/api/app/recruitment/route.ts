@@ -543,6 +543,64 @@ export async function PATCH(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
   const entity = String(body.entity ?? "").trim();
 
+  if (entity === "event") {
+    const eventId = String(body.eventId ?? "").trim();
+    if (!eventId) return NextResponse.json({ error: "eventId is required" }, { status: 400 });
+
+    const { data: existingEvent, error: getErr } = await supabase
+      .from("recruitment_events")
+      .select("id")
+      .eq("id", eventId)
+      .eq("tenant_id", tenantId)
+      .single();
+
+    if (getErr || !existingEvent) return NextResponse.json({ error: "Event not found" }, { status: 404 });
+
+    const name = String(body.name ?? "").trim();
+    if (!name) return NextResponse.json({ error: "Event name is required" }, { status: 400 });
+
+    const eventType = String(body.eventType ?? "tryout").trim();
+    const validTypes = ["tryout", "open_session", "interest_form", "camp", "other"];
+    if (!validTypes.includes(eventType)) {
+      return NextResponse.json({ error: "Invalid event type" }, { status: 400 });
+    }
+
+    const genderRaw = String(body.gender ?? "").trim().toLowerCase();
+    const gender = genderRaw ? (["boys", "girls", "coed"].includes(genderRaw) ? genderRaw : null) : null;
+
+    const startAtRaw = String(body.startAt ?? "").trim();
+    const durationMinutes = Number(body.durationMinutes ?? 0);
+    if (!startAtRaw) return NextResponse.json({ error: "startAt is required" }, { status: 400 });
+    if (!Number.isFinite(durationMinutes) || durationMinutes <= 0 || durationMinutes > 24 * 60) {
+      return NextResponse.json({ error: "durationMinutes must be between 1 and 1440" }, { status: 400 });
+    }
+
+    const startsAtDate = new Date(startAtRaw);
+    if (Number.isNaN(startsAtDate.getTime())) {
+      return NextResponse.json({ error: "Invalid startAt value" }, { status: 400 });
+    }
+    const endsAtDate = new Date(startsAtDate.getTime() + durationMinutes * 60_000);
+
+    const { data: updatedEvent, error: updateErr } = await supabase
+      .from("recruitment_events")
+      .update({
+        team_id: body.teamId ?? null,
+        name,
+        event_type: eventType,
+        season: body.season ?? null,
+        gender,
+        starts_at: startsAtDate.toISOString(),
+        ends_at: endsAtDate.toISOString(),
+        location: body.location ?? null,
+      })
+      .eq("id", eventId)
+      .select("*")
+      .single();
+
+    if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 });
+    return NextResponse.json({ event: updatedEvent });
+  }
+
   if (entity === "registration_link") {
     const linkId = String(body.linkId ?? "").trim();
     if (!linkId) return NextResponse.json({ error: "linkId is required" }, { status: 400 });
