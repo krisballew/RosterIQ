@@ -127,29 +127,39 @@ function parseCsv(csv: string) {
 // Management roles have full tenant-wide visibility.
 // Any other role (coaches, or any unrecognized value) is scoped to their assigned teams.
 const MANAGEMENT_ROLES = ["platform_admin", "club_admin", "club_director", "director_of_coaching"] as const;
+const COACH_ROLES = ["select_coach", "academy_coach"] as const;
 type ManagementRole = (typeof MANAGEMENT_ROLES)[number];
 
 export async function GET(request: NextRequest) {
   const auth = await requireRecruitmentAccess(false);
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
-  const { supabase, tenantId, role, membershipId } = auth;
-  const isManager = MANAGEMENT_ROLES.includes(role as ManagementRole);
+  const { supabase, tenantId, membershipId } = auth;
 
-  // Non-managers are scoped to teams they are assigned as coach.
-  // Using !isManager (deny-list) rather than isCoach (allow-list) means an
-  // unrecognized or unexpected role also gets restricted access by default.
+  // Fetch ALL active memberships for this user in this tenant so we can accurately
+  // determine their access level. Relying solely on auth.role is unsafe because
+  // _auth.ts may pick a management-level membership if the user has more than one,
+  // which would incorrectly grant full visibility.
+  const { data: allMemberships } = await supabase
+    .from("memberships")
+    .select("id, role")
+    .eq("user_id", auth.user.id)
+    .eq("tenant_id", tenantId)
+    .eq("is_active", true);
+
+  const memberships = allMemberships ?? [];
+  const membershipIds = memberships.map((m: { id: string }) => m.id);
+  const membershipRoles = memberships.map((m: { role: string }) => m.role);
+
+  // A user is a manager only if they hold at least one management-level role.
+  const isManager = membershipRoles.some((r) => MANAGEMENT_ROLES.includes(r as ManagementRole));
+
+  // Effective role for the client UI: prefer coach role (most restrictive) if present.
+  const coachRole = membershipRoles.find((r) => COACH_ROLES.includes(r as (typeof COACH_ROLES)[number]));
+  const effectiveRole = coachRole ?? auth.role;
+
   let coachTeamIds: string[] | null = null;
   if (!isManager) {
-    const { data: userMemberships } = await supabase
-      .from("memberships")
-      .select("id")
-      .eq("user_id", auth.user.id)
-      .eq("tenant_id", tenantId)
-      .eq("is_active", true);
-
-    const membershipIds = (userMemberships ?? []).map((m: { id: string }) => m.id);
-
     if (membershipIds.length > 0) {
       const { data: coachTeams } = await supabase
         .from("teams")
@@ -226,7 +236,7 @@ export async function GET(request: NextRequest) {
   ]);
 
   return NextResponse.json({
-    role,
+    role: effectiveRole,
     prospects: prospectsRes.data ?? [],
     events: eventsRes.data ?? [],
     links: linksRes.data ?? [],
