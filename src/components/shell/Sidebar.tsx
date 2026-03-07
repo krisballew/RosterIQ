@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Tenant } from "@/types/database";
+import type { Role } from "@/types/database";
 
 const navItems = [
   { href: "/app/home", label: "Home", icon: LayoutDashboard },
@@ -23,6 +24,7 @@ const navItems = [
   { href: "/app/lineup", label: "Lineup Builder", icon: Layers },
   { href: "/app/reviews", label: "Player Reviews", icon: ClipboardList },
   { href: "/app/education", label: "Education", icon: BookOpen },
+  { href: "/app/my-training", label: "My Training", icon: BookOpen },
   { href: "/app/recruitment", label: "Recruitment", icon: Search },
   { href: "/app/fields", label: "Field Assignments", icon: MapPin },
 ];
@@ -32,10 +34,20 @@ interface SidebarProps {
   isClubAdmin?: boolean;
   pendingRequestsCount?: number;
   currentTenant?: Tenant | null;
+  highestRole?: Role | null;
 }
 
-export function Sidebar({ isPlatformAdmin, isClubAdmin = false, pendingRequestsCount = 0, currentTenant }: SidebarProps) {
+export function Sidebar({ isPlatformAdmin, isClubAdmin = false, pendingRequestsCount = 0, currentTenant, highestRole }: SidebarProps) {
   const pathname = usePathname();
+
+  // Determine which nav items to show based on role
+  const isPlayer = highestRole && ["select_player", "academy_player"].includes(highestRole);
+  
+  const visibleNavItems = isPlayer
+    ? navItems.filter((item) => 
+        ["/app/home", "/app/reviews", "/app/education", "/app/my-training"].includes(item.href)
+      )
+    : navItems;
 
   return (
     <aside className="flex h-full w-64 flex-col bg-white">
@@ -65,7 +77,7 @@ export function Sidebar({ isPlatformAdmin, isClubAdmin = false, pendingRequestsC
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto px-3 py-4">
         <ul className="space-y-1">
-          {navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const Icon = item.icon;
             const isActive =
               pathname === item.href || pathname.startsWith(item.href + "/");
@@ -93,7 +105,7 @@ export function Sidebar({ isPlatformAdmin, isClubAdmin = false, pendingRequestsC
           })}
         </ul>
 
-        {(isClubAdmin || isPlatformAdmin) && (
+        {!isPlayer && (isClubAdmin || isPlatformAdmin) && (
           <div className="mt-6">
             <p className="mb-1 px-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
               Club Admin

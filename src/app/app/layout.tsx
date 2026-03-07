@@ -76,7 +76,7 @@ export default async function AppLayout({
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50">
-      <Sidebar isPlatformAdmin={isAdmin} isClubAdmin={isClubAdmin} pendingRequestsCount={pendingRequestsCount} currentTenant={currentTenant} />
+      <Sidebar isPlatformAdmin={isAdmin} isClubAdmin={isClubAdmin} pendingRequestsCount={pendingRequestsCount} currentTenant={currentTenant} highestRole={highestRole} />
       <div className="flex flex-1 flex-col overflow-hidden">
         <Header
           profile={profile}

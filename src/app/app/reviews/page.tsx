@@ -11,6 +11,8 @@ const ALLOWED_ROLES = [
   "director_of_coaching",
   "select_coach",
   "academy_coach",
+  "select_player",
+  "academy_player",
 ] as const;
 
 export default async function ReviewsPage() {

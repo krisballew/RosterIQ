@@ -28,13 +28,16 @@ export default async function EducationPage() {
   // Route users based on their highest role
   const adminRoles = ["platform_admin", "club_admin", "director_of_coaching", "club_director"];
   const coachRoles = ["select_coach", "academy_coach"];
+  const playerRoles = ["select_player", "academy_player"];
 
   if (highestRole && adminRoles.includes(highestRole)) {
     redirect("/app/training-library");
   } else if (highestRole && coachRoles.includes(highestRole)) {
     redirect("/app/training");
+  } else if (highestRole && playerRoles.includes(highestRole)) {
+    redirect("/app/education-library");
   } else {
-    // Players and default case
-    redirect("/app/my-training");
+    // Default fallback
+    redirect("/app/home");
   }
 }
