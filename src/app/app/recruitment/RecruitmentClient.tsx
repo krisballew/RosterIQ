@@ -687,28 +687,40 @@ export function RecruitmentClient() {
           <div className="rounded-xl border border-gray-200 bg-white p-3 space-y-3">
             <div className="flex items-center gap-2 text-sm font-semibold text-gray-800"><Filter className="h-4 w-4" /> Filters</div>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
-              <Input placeholder="Search name/email/club" value={filters.q} onChange={(e) => setFilters((prev) => ({ ...prev, q: e.target.value }))} />
-              <Select value={filters.status || "all"} onValueChange={(v) => setFilters((prev) => ({ ...prev, status: v === "all" ? "" : v }))}>
-                <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  {data.statuses.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <Select value={filters.teamId || "all"} onValueChange={(v) => setFilters((prev) => ({ ...prev, teamId: v === "all" ? "" : v }))}>
-                <SelectTrigger><SelectValue placeholder="Team" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Teams</SelectItem>
-                  {data.teams.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <Select value={filters.archived ? "archived" : "active"} onValueChange={(v) => setFilters((prev) => ({ ...prev, archived: v === "archived" }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">Active Prospects</SelectItem>
-                  <SelectItem value="archived">Archived/Historical</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="space-y-1">
+                <Label htmlFor="filter-query">Search</Label>
+                <Input id="filter-query" placeholder="Example: vale, contact+q9z@sample.invalid" value={filters.q} onChange={(e) => setFilters((prev) => ({ ...prev, q: e.target.value }))} />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="filter-status">Status</Label>
+                <Select value={filters.status || "all"} onValueChange={(v) => setFilters((prev) => ({ ...prev, status: v === "all" ? "" : v }))}>
+                  <SelectTrigger id="filter-status"><SelectValue placeholder="Select status" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    {data.statuses.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="filter-team">Team</Label>
+                <Select value={filters.teamId || "all"} onValueChange={(v) => setFilters((prev) => ({ ...prev, teamId: v === "all" ? "" : v }))}>
+                  <SelectTrigger id="filter-team"><SelectValue placeholder="Select team" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Teams</SelectItem>
+                    {data.teams.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="filter-archive">Record Scope</Label>
+                <Select value={filters.archived ? "archived" : "active"} onValueChange={(v) => setFilters((prev) => ({ ...prev, archived: v === "archived" }))}>
+                  <SelectTrigger id="filter-archive"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Active Prospects</SelectItem>
+                    <SelectItem value="archived">Archived/Historical</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="flex items-center gap-2">
               <Button size="sm" onClick={() => void loadData(filters)}><Search className="h-4 w-4 mr-1" /> Apply Filters</Button>
@@ -777,27 +789,51 @@ export function RecruitmentClient() {
                             {data.statuses.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                           </SelectContent>
                         </Select>
-                        <Input placeholder="Reason (optional)" value={statusChange.reason} onChange={(e) => setStatusChange((prev) => ({ ...prev, reason: e.target.value }))} />
+                        <div className="space-y-1">
+                          <Label htmlFor="status-change-reason">Reason (optional)</Label>
+                          <Input id="status-change-reason" placeholder="Example: internal-review-q7" value={statusChange.reason} onChange={(e) => setStatusChange((prev) => ({ ...prev, reason: e.target.value }))} />
+                        </div>
                         <Button size="sm" onClick={() => void changeStatus()} disabled={!statusChange.newStatus}>Update Status</Button>
                       </div>
 
                       <div className="space-y-2">
                         <Label>Add Evaluation</Label>
                         <div className="grid grid-cols-2 gap-2">
-                          <Select value={newEval.eventId || "none"} onValueChange={(v) => setNewEval((prev) => ({ ...prev, eventId: v === "none" ? "" : v }))}>
-                            <SelectTrigger><SelectValue placeholder="Event" /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="none">No event</SelectItem>
-                              {data.events.map((e) => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                          <Input placeholder="Rating (1-5)" value={newEval.rating} onChange={(e) => setNewEval((prev) => ({ ...prev, rating: e.target.value }))} />
+                          <div className="space-y-1">
+                            <Label htmlFor="eval-event">Event</Label>
+                            <Select value={newEval.eventId || "none"} onValueChange={(v) => setNewEval((prev) => ({ ...prev, eventId: v === "none" ? "" : v }))}>
+                              <SelectTrigger id="eval-event"><SelectValue placeholder="Select event" /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">No event</SelectItem>
+                                {data.events.map((e) => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-1">
+                            <Label htmlFor="eval-rating">Rating (1-5)</Label>
+                            <Input id="eval-rating" placeholder="Example: 4" value={newEval.rating} onChange={(e) => setNewEval((prev) => ({ ...prev, rating: e.target.value }))} />
+                          </div>
                         </div>
-                        <Input placeholder="Readiness" value={newEval.readiness} onChange={(e) => setNewEval((prev) => ({ ...prev, readiness: e.target.value }))} />
-                        <Input placeholder="Strengths" value={newEval.strengths} onChange={(e) => setNewEval((prev) => ({ ...prev, strengths: e.target.value }))} />
-                        <Input placeholder="Development areas" value={newEval.developmentAreas} onChange={(e) => setNewEval((prev) => ({ ...prev, developmentAreas: e.target.value }))} />
-                        <Input placeholder="Tags (comma separated)" value={newEval.tags} onChange={(e) => setNewEval((prev) => ({ ...prev, tags: e.target.value }))} />
-                        <Input placeholder="Notes" value={newEval.notes} onChange={(e) => setNewEval((prev) => ({ ...prev, notes: e.target.value }))} />
+                        <div className="space-y-1">
+                          <Label htmlFor="eval-readiness">Readiness</Label>
+                          <Input id="eval-readiness" placeholder="Example: roster-ready-in-60d" value={newEval.readiness} onChange={(e) => setNewEval((prev) => ({ ...prev, readiness: e.target.value }))} />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="eval-strengths">Strengths</Label>
+                          <Input id="eval-strengths" placeholder="Example: first-touch, vision" value={newEval.strengths} onChange={(e) => setNewEval((prev) => ({ ...prev, strengths: e.target.value }))} />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="eval-dev-areas">Development Areas</Label>
+                          <Input id="eval-dev-areas" placeholder="Example: weak-foot, scanning" value={newEval.developmentAreas} onChange={(e) => setNewEval((prev) => ({ ...prev, developmentAreas: e.target.value }))} />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="eval-tags">Tags (comma separated)</Label>
+                          <Input id="eval-tags" placeholder="Example: tag-a7, priority-b2" value={newEval.tags} onChange={(e) => setNewEval((prev) => ({ ...prev, tags: e.target.value }))} />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="eval-notes">Notes</Label>
+                          <Input id="eval-notes" placeholder="Example: checkpoint-obs-91" value={newEval.notes} onChange={(e) => setNewEval((prev) => ({ ...prev, notes: e.target.value }))} />
+                        </div>
                         <Button size="sm" onClick={() => void addEvaluation()}><ClipboardCheck className="h-4 w-4 mr-1" /> Save Evaluation</Button>
                       </div>
 
@@ -832,31 +868,85 @@ export function RecruitmentClient() {
               <div className="rounded-xl border border-gray-200 bg-white p-3 space-y-3">
                 <h3 className="text-sm font-semibold text-gray-900">Manual Prospect Intake</h3>
                 <div className="grid grid-cols-2 gap-2">
-                  <Input placeholder="First name" value={newProspect.firstName} onChange={(e) => setNewProspect((prev) => ({ ...prev, firstName: e.target.value }))} />
-                  <Input placeholder="Last name" value={newProspect.lastName} onChange={(e) => setNewProspect((prev) => ({ ...prev, lastName: e.target.value }))} />
-                  <Input type="date" value={newProspect.dateOfBirth} onChange={(e) => setNewProspect((prev) => ({ ...prev, dateOfBirth: e.target.value }))} />
-                  <Input placeholder="Age division" value={newProspect.ageDivision} onChange={(e) => setNewProspect((prev) => ({ ...prev, ageDivision: e.target.value }))} />
-                  <Input placeholder="Gender" value={newProspect.gender} onChange={(e) => setNewProspect((prev) => ({ ...prev, gender: e.target.value }))} />
-                  <Select value={newProspect.teamId || "none"} onValueChange={(v) => setNewProspect((prev) => ({ ...prev, teamId: v === "none" ? "" : v }))}>
-                    <SelectTrigger><SelectValue placeholder="Team" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">No team</SelectItem>
-                      {data.teams.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                  <Input placeholder="Parent/Guardian name" value={newProspect.parentName} onChange={(e) => setNewProspect((prev) => ({ ...prev, parentName: e.target.value }))} />
-                  <Input placeholder="Parent email" value={newProspect.parentEmail} onChange={(e) => setNewProspect((prev) => ({ ...prev, parentEmail: e.target.value }))} />
-                  <Input placeholder="Parent phone" value={newProspect.parentPhone} onChange={(e) => setNewProspect((prev) => ({ ...prev, parentPhone: e.target.value }))} />
-                  <Input placeholder="Current club" value={newProspect.currentClub} onChange={(e) => setNewProspect((prev) => ({ ...prev, currentClub: e.target.value }))} />
-                  <Input placeholder="Current team" value={newProspect.currentTeam} onChange={(e) => setNewProspect((prev) => ({ ...prev, currentTeam: e.target.value }))} />
-                  <Input placeholder="Primary position" value={newProspect.primaryPosition} onChange={(e) => setNewProspect((prev) => ({ ...prev, primaryPosition: e.target.value }))} />
-                  <Input placeholder="Secondary position" value={newProspect.secondaryPosition} onChange={(e) => setNewProspect((prev) => ({ ...prev, secondaryPosition: e.target.value }))} />
-                  <Input placeholder="Grad year" value={newProspect.gradYear} onChange={(e) => setNewProspect((prev) => ({ ...prev, gradYear: e.target.value }))} />
-                  <Input placeholder="School year" value={newProspect.schoolYear} onChange={(e) => setNewProspect((prev) => ({ ...prev, schoolYear: e.target.value }))} />
-                  <Input placeholder="Recruiting source" value={newProspect.recruitingSource} onChange={(e) => setNewProspect((prev) => ({ ...prev, recruitingSource: e.target.value }))} />
-                  <Input placeholder="Roster fit tag" value={newProspect.rosterFitTag} onChange={(e) => setNewProspect((prev) => ({ ...prev, rosterFitTag: e.target.value }))} />
+                  <div className="space-y-1">
+                    <Label htmlFor="prospect-first-name">First Name</Label>
+                    <Input id="prospect-first-name" placeholder="Example: Arin" value={newProspect.firstName} onChange={(e) => setNewProspect((prev) => ({ ...prev, firstName: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="prospect-last-name">Last Name</Label>
+                    <Input id="prospect-last-name" placeholder="Example: Vale" value={newProspect.lastName} onChange={(e) => setNewProspect((prev) => ({ ...prev, lastName: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="prospect-dob">Date of Birth</Label>
+                    <Input id="prospect-dob" type="date" value={newProspect.dateOfBirth} onChange={(e) => setNewProspect((prev) => ({ ...prev, dateOfBirth: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="prospect-age-division">Age Division</Label>
+                    <Input id="prospect-age-division" placeholder="Example: U13" value={newProspect.ageDivision} onChange={(e) => setNewProspect((prev) => ({ ...prev, ageDivision: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="prospect-gender">Gender</Label>
+                    <Input id="prospect-gender" placeholder="Example: coed" value={newProspect.gender} onChange={(e) => setNewProspect((prev) => ({ ...prev, gender: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="prospect-team">Team</Label>
+                    <Select value={newProspect.teamId || "none"} onValueChange={(v) => setNewProspect((prev) => ({ ...prev, teamId: v === "none" ? "" : v }))}>
+                      <SelectTrigger id="prospect-team"><SelectValue placeholder="Select team" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No team</SelectItem>
+                        {data.teams.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="prospect-parent-name">Parent/Guardian Name</Label>
+                    <Input id="prospect-parent-name" placeholder="Example: Guardian-X4" value={newProspect.parentName} onChange={(e) => setNewProspect((prev) => ({ ...prev, parentName: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="prospect-parent-email">Parent Email</Label>
+                    <Input id="prospect-parent-email" placeholder="Example: contact+q9z@sample.invalid" value={newProspect.parentEmail} onChange={(e) => setNewProspect((prev) => ({ ...prev, parentEmail: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="prospect-parent-phone">Parent Phone</Label>
+                    <Input id="prospect-parent-phone" placeholder="Example: 000-555-0199" value={newProspect.parentPhone} onChange={(e) => setNewProspect((prev) => ({ ...prev, parentPhone: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="prospect-current-club">Current Club</Label>
+                    <Input id="prospect-current-club" placeholder="Example: Club-AX17" value={newProspect.currentClub} onChange={(e) => setNewProspect((prev) => ({ ...prev, currentClub: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="prospect-current-team">Current Team</Label>
+                    <Input id="prospect-current-team" placeholder="Example: Squad-K2" value={newProspect.currentTeam} onChange={(e) => setNewProspect((prev) => ({ ...prev, currentTeam: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="prospect-primary-position">Primary Position</Label>
+                    <Input id="prospect-primary-position" placeholder="Example: ST" value={newProspect.primaryPosition} onChange={(e) => setNewProspect((prev) => ({ ...prev, primaryPosition: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="prospect-secondary-position">Secondary Position</Label>
+                    <Input id="prospect-secondary-position" placeholder="Example: RW" value={newProspect.secondaryPosition} onChange={(e) => setNewProspect((prev) => ({ ...prev, secondaryPosition: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="prospect-grad-year">Grad Year</Label>
+                    <Input id="prospect-grad-year" placeholder="Example: 2031" value={newProspect.gradYear} onChange={(e) => setNewProspect((prev) => ({ ...prev, gradYear: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="prospect-school-year">School Year</Label>
+                    <Input id="prospect-school-year" placeholder="Example: 7th" value={newProspect.schoolYear} onChange={(e) => setNewProspect((prev) => ({ ...prev, schoolYear: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="prospect-source">Recruiting Source</Label>
+                    <Input id="prospect-source" placeholder="Example: source-zeta-33" value={newProspect.recruitingSource} onChange={(e) => setNewProspect((prev) => ({ ...prev, recruitingSource: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="prospect-fit-tag">Roster Fit Tag</Label>
+                    <Input id="prospect-fit-tag" placeholder="Example: fit-band-b" value={newProspect.rosterFitTag} onChange={(e) => setNewProspect((prev) => ({ ...prev, rosterFitTag: e.target.value }))} />
+                  </div>
                 </div>
-                <Input placeholder="Notes" value={newProspect.notes} onChange={(e) => setNewProspect((prev) => ({ ...prev, notes: e.target.value }))} />
+                <div className="space-y-1">
+                  <Label htmlFor="prospect-notes">Notes</Label>
+                  <Input id="prospect-notes" placeholder="Example: intake-note-r3" value={newProspect.notes} onChange={(e) => setNewProspect((prev) => ({ ...prev, notes: e.target.value }))} />
+                </div>
                 <Button onClick={() => void createProspect()}><Plus className="h-4 w-4 mr-1" /> Add Prospect</Button>
               </div>
 
@@ -864,53 +954,95 @@ export function RecruitmentClient() {
                 <div className="rounded-xl border border-gray-200 bg-white p-3 space-y-2">
                   <h3 className="text-sm font-semibold text-gray-900">Events & Public Registration Links</h3>
                   <div className="grid grid-cols-2 gap-2">
-                    <Input placeholder="Event name" value={newEvent.name} onChange={(e) => setNewEvent((prev) => ({ ...prev, name: e.target.value }))} />
-                    <Select value={newEvent.eventType} onValueChange={(v) => setNewEvent((prev) => ({ ...prev, eventType: v }))}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="tryout">Tryout</SelectItem>
-                        <SelectItem value="open_session">Open Session</SelectItem>
-                        <SelectItem value="interest_form">Interest Form</SelectItem>
-                        <SelectItem value="camp">Camp</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Input placeholder="Season" value={newEvent.season} onChange={(e) => setNewEvent((prev) => ({ ...prev, season: e.target.value }))} />
-                    <Input placeholder="Age division" value={newEvent.ageDivision} onChange={(e) => setNewEvent((prev) => ({ ...prev, ageDivision: e.target.value }))} />
-                    <Select value={newEvent.gender} onValueChange={(v) => setNewEvent((prev) => ({ ...prev, gender: v }))}>
-                      <SelectTrigger><SelectValue placeholder="Gender" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="coed">Coed</SelectItem>
-                        <SelectItem value="boys">Boys</SelectItem>
-                        <SelectItem value="girls">Girls</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Input placeholder="Location" value={newEvent.location} onChange={(e) => setNewEvent((prev) => ({ ...prev, location: e.target.value }))} />
-                    <Input type="date" value={newEvent.startDate} onChange={(e) => setNewEvent((prev) => ({ ...prev, startDate: e.target.value }))} />
-                    <Input type="time" value={newEvent.startTime} onChange={(e) => setNewEvent((prev) => ({ ...prev, startTime: e.target.value }))} />
-                    <Input type="number" min={15} max={720} step={15} placeholder="Duration (minutes)" value={newEvent.durationMinutes} onChange={(e) => setNewEvent((prev) => ({ ...prev, durationMinutes: e.target.value }))} />
+                    <div className="space-y-1">
+                      <Label htmlFor="event-name">Event Name</Label>
+                      <Input id="event-name" placeholder="Example: Session-P9" value={newEvent.name} onChange={(e) => setNewEvent((prev) => ({ ...prev, name: e.target.value }))} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="event-type">Event Type</Label>
+                      <Select value={newEvent.eventType} onValueChange={(v) => setNewEvent((prev) => ({ ...prev, eventType: v }))}>
+                        <SelectTrigger id="event-type"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="tryout">Tryout</SelectItem>
+                          <SelectItem value="open_session">Open Session</SelectItem>
+                          <SelectItem value="interest_form">Interest Form</SelectItem>
+                          <SelectItem value="camp">Camp</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="event-season">Season</Label>
+                      <Input id="event-season" placeholder="Example: 2026-fall" value={newEvent.season} onChange={(e) => setNewEvent((prev) => ({ ...prev, season: e.target.value }))} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="event-age-division">Age Division</Label>
+                      <Input id="event-age-division" placeholder="Example: U14" value={newEvent.ageDivision} onChange={(e) => setNewEvent((prev) => ({ ...prev, ageDivision: e.target.value }))} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="event-gender">Gender</Label>
+                      <Select value={newEvent.gender} onValueChange={(v) => setNewEvent((prev) => ({ ...prev, gender: v }))}>
+                        <SelectTrigger id="event-gender"><SelectValue placeholder="Select gender" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="coed">Coed</SelectItem>
+                          <SelectItem value="boys">Boys</SelectItem>
+                          <SelectItem value="girls">Girls</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="event-location">Location</Label>
+                      <Input id="event-location" placeholder="Example: Field-Zone-4" value={newEvent.location} onChange={(e) => setNewEvent((prev) => ({ ...prev, location: e.target.value }))} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="event-start-date">Start Date</Label>
+                      <Input id="event-start-date" type="date" value={newEvent.startDate} onChange={(e) => setNewEvent((prev) => ({ ...prev, startDate: e.target.value }))} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="event-start-time">Start Time</Label>
+                      <Input id="event-start-time" type="time" value={newEvent.startTime} onChange={(e) => setNewEvent((prev) => ({ ...prev, startTime: e.target.value }))} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="event-duration">Duration (minutes)</Label>
+                      <Input id="event-duration" type="number" min={15} max={720} step={15} placeholder="Example: 90" value={newEvent.durationMinutes} onChange={(e) => setNewEvent((prev) => ({ ...prev, durationMinutes: e.target.value }))} />
+                    </div>
                   </div>
                   <Button size="sm" onClick={() => void createEvent()}><CalendarClock className="h-4 w-4 mr-1" /> Create Event</Button>
 
                   <div className="border-t border-gray-200 pt-3 grid grid-cols-2 gap-2">
-                    <Input placeholder="Link name" value={newLink.name} onChange={(e) => setNewLink((prev) => ({ ...prev, name: e.target.value }))} />
-                    <Select value={newLink.eventId || "none"} onValueChange={(v) => setNewLink((prev) => ({ ...prev, eventId: v === "none" ? "" : v }))}>
-                      <SelectTrigger><SelectValue placeholder="Select event" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">No event</SelectItem>
-                        {data.events.map((e) => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    <Select value={newLink.teamId || "none"} onValueChange={(v) => setNewLink((prev) => ({ ...prev, teamId: v === "none" ? "" : v }))}>
-                      <SelectTrigger><SelectValue placeholder="Team (optional)" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">No team</SelectItem>
-                        {data.teams.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                    <div className="space-y-1">
+                      <Label htmlFor="link-name">Link Name</Label>
+                      <Input id="link-name" placeholder="Example: intake-link-v2" value={newLink.name} onChange={(e) => setNewLink((prev) => ({ ...prev, name: e.target.value }))} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="link-event">Event</Label>
+                      <Select value={newLink.eventId || "none"} onValueChange={(v) => setNewLink((prev) => ({ ...prev, eventId: v === "none" ? "" : v }))}>
+                        <SelectTrigger id="link-event"><SelectValue placeholder="Select event" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">No event</SelectItem>
+                          {data.events.map((e) => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="link-team">Team (optional)</Label>
+                      <Select value={newLink.teamId || "none"} onValueChange={(v) => setNewLink((prev) => ({ ...prev, teamId: v === "none" ? "" : v }))}>
+                        <SelectTrigger id="link-team"><SelectValue placeholder="Select team" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">No team</SelectItem>
+                          {data.teams.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
                     <div />
-                    <Input type="date" placeholder="Active from date" value={newLink.startsOn} onChange={(e) => setNewLink((prev) => ({ ...prev, startsOn: e.target.value }))} />
-                    <Input type="date" placeholder="Active until date" value={newLink.endsOn} onChange={(e) => setNewLink((prev) => ({ ...prev, endsOn: e.target.value }))} />
+                    <div className="space-y-1">
+                      <Label htmlFor="link-starts-on">Active From</Label>
+                      <Input id="link-starts-on" type="date" value={newLink.startsOn} onChange={(e) => setNewLink((prev) => ({ ...prev, startsOn: e.target.value }))} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="link-ends-on">Active Until</Label>
+                      <Input id="link-ends-on" type="date" value={newLink.endsOn} onChange={(e) => setNewLink((prev) => ({ ...prev, endsOn: e.target.value }))} />
+                    </div>
                   </div>
                   <Button size="sm" variant="outline" onClick={() => void createRegistrationLink()}><LinkIcon className="h-4 w-4 mr-1" /> Create Public Link</Button>
 
@@ -1031,7 +1163,7 @@ export function RecruitmentClient() {
                     value={csvText}
                     onChange={(e) => setCsvText(e.target.value)}
                     className="w-full min-h-28 rounded-md border border-gray-200 p-2 text-xs"
-                    placeholder="first_name,last_name,parent_email\nJane,Doe,jane@example.com"
+                    placeholder="first_name,last_name,parent_email\nArin,Vale,contact+q9z@sample.invalid"
                   />
                   {csvHeaders.length > 0 && (
                     <div className="space-y-2">
@@ -1095,28 +1227,49 @@ export function RecruitmentClient() {
               <div className="rounded-xl border border-gray-200 bg-white p-3 space-y-2">
                 <h3 className="text-sm font-semibold text-gray-900">Recruiting Plan Builder</h3>
                 <div className="grid grid-cols-2 gap-2">
-                  <Select value={newPlan.teamId || "none"} onValueChange={(v) => setNewPlan((prev) => ({ ...prev, teamId: v === "none" ? "" : v }))}>
-                    <SelectTrigger><SelectValue placeholder="Team" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">No team</SelectItem>
-                      {data.teams.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                  <Input placeholder="Age division" value={newPlan.ageDivision} onChange={(e) => setNewPlan((prev) => ({ ...prev, ageDivision: e.target.value }))} />
-                  <Input placeholder="Target roster size" value={newPlan.targetRosterSize} onChange={(e) => setNewPlan((prev) => ({ ...prev, targetRosterSize: e.target.value }))} />
-                  <Select value={newPlan.recruitingPriority} onValueChange={(v) => setNewPlan((prev) => ({ ...prev, recruitingPriority: v }))}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="low">Low</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="high">High</SelectItem>
-                      <SelectItem value="urgent">Urgent</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <div className="space-y-1">
+                    <Label htmlFor="plan-team">Team</Label>
+                    <Select value={newPlan.teamId || "none"} onValueChange={(v) => setNewPlan((prev) => ({ ...prev, teamId: v === "none" ? "" : v }))}>
+                      <SelectTrigger id="plan-team"><SelectValue placeholder="Select team" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No team</SelectItem>
+                        {data.teams.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="plan-age-division">Age Division</Label>
+                    <Input id="plan-age-division" placeholder="Example: U15" value={newPlan.ageDivision} onChange={(e) => setNewPlan((prev) => ({ ...prev, ageDivision: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="plan-target-size">Target Roster Size</Label>
+                    <Input id="plan-target-size" placeholder="Example: 18" value={newPlan.targetRosterSize} onChange={(e) => setNewPlan((prev) => ({ ...prev, targetRosterSize: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="plan-priority">Recruiting Priority</Label>
+                    <Select value={newPlan.recruitingPriority} onValueChange={(v) => setNewPlan((prev) => ({ ...prev, recruitingPriority: v }))}>
+                      <SelectTrigger id="plan-priority"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="low">Low</SelectItem>
+                        <SelectItem value="medium">Medium</SelectItem>
+                        <SelectItem value="high">High</SelectItem>
+                        <SelectItem value="urgent">Urgent</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-                <Input placeholder="Open positions (comma separated)" value={newPlan.openPositions} onChange={(e) => setNewPlan((prev) => ({ ...prev, openPositions: e.target.value }))} />
-                <Input placeholder="Upcoming tryout dates (comma separated YYYY-MM-DD)" value={newPlan.upcomingDates} onChange={(e) => setNewPlan((prev) => ({ ...prev, upcomingDates: e.target.value }))} />
-                <Input placeholder="Plan notes" value={newPlan.notes} onChange={(e) => setNewPlan((prev) => ({ ...prev, notes: e.target.value }))} />
+                <div className="space-y-1">
+                  <Label htmlFor="plan-open-positions">Open Positions (comma separated)</Label>
+                  <Input id="plan-open-positions" placeholder="Example: ST, RW, CB" value={newPlan.openPositions} onChange={(e) => setNewPlan((prev) => ({ ...prev, openPositions: e.target.value }))} />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="plan-upcoming-dates">Upcoming Tryout Dates (comma separated YYYY-MM-DD)</Label>
+                  <Input id="plan-upcoming-dates" placeholder="Example: 2026-09-05, 2026-09-12" value={newPlan.upcomingDates} onChange={(e) => setNewPlan((prev) => ({ ...prev, upcomingDates: e.target.value }))} />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="plan-notes">Plan Notes</Label>
+                  <Input id="plan-notes" placeholder="Example: plan-note-c4" value={newPlan.notes} onChange={(e) => setNewPlan((prev) => ({ ...prev, notes: e.target.value }))} />
+                </div>
                 <Button onClick={() => void savePlan()}><Plus className="h-4 w-4 mr-1" /> Save Plan</Button>
               </div>
 
