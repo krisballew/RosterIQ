@@ -228,7 +228,10 @@ export default function RegisterPage() {
               <p><strong>Event:</strong> {linkData.event.name}</p>
               {linkData.event.location && <p><strong>Location:</strong> {linkData.event.location}</p>}
               {linkData.event.starts_at && (
-                <p><strong>Date:</strong> {new Date(linkData.event.starts_at).toLocaleDateString()}</p>
+                <p><strong>Date:</strong> {new Date(linkData.event.starts_at).toLocaleDateString(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</p>
+              )}
+              {linkData.event.starts_at && (
+                <p><strong>Time:</strong> {new Date(linkData.event.starts_at).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}{linkData.event.ends_at ? ` – ${new Date(linkData.event.ends_at).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}` : ""}</p>
               )}
             </div>
           )}

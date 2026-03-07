@@ -406,6 +406,11 @@ export function RecruitmentClient() {
     const startAt = `${newEvent.startDate}T${newEvent.startTime}`;
 
     const selectedSpace = data.fieldSpaces.find((s) => s.id === newEvent.fieldSpaceId);
+    const locationLabel = selectedSpace
+      ? selectedSpace.complex_name
+        ? `${selectedSpace.complex_name} — ${selectedSpace.name}`
+        : selectedSpace.name
+      : null;
 
     const res = await fetch("/api/app/recruitment", {
       method: "POST",
@@ -418,7 +423,7 @@ export function RecruitmentClient() {
         gender: newEvent.gender,
         startAt,
         durationMinutes,
-        location: selectedSpace?.name ?? null,
+        location: locationLabel,
         teamId: newEvent.teamId || null,
         fieldSpaceId: newEvent.fieldSpaceId || null,
         fieldSpaceMapId: selectedSpace?.map_id ?? null,
