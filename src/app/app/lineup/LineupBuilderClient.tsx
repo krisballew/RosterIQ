@@ -1041,6 +1041,7 @@ export function LineupBuilderClient({ initialTeams, initialUnassigned }: LineupB
       id: virtualId,
       name,
       age_division: virtualTeamDivision.trim() || null,
+      coach_membership_id: null,
       roster_limit: Number(virtualTeamLimit) || 16,
       tenant_id: "",
       birth_year: null,

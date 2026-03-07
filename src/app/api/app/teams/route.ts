@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import type { Team } from "@/types/database";
 
 export const runtime = "nodejs";
+
+const COACH_ASSIGNABLE_ROLES = ["select_coach", "academy_coach", "director_of_coaching"] as const;
 
 // GET /api/app/teams
 // Returns all teams for the caller's tenant, each with their players embedded.
@@ -69,6 +72,7 @@ export async function GET() {
       tenant_id: tenantId,
       name,
       age_division: null,
+      coach_membership_id: null,
       birth_year: null,
       roster_limit: 16,
       created_at: new Date().toISOString(),
@@ -116,10 +120,35 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { name, age_division, birth_year, roster_limit } = body;
+  const { name, age_division, birth_year, roster_limit, coach_membership_id } = body;
 
   if (!name?.trim()) {
     return NextResponse.json({ error: "name is required" }, { status: 400 });
+  }
+
+  let coachMembershipId: string | null = null;
+  if (typeof coach_membership_id === "string" && coach_membership_id.trim()) {
+    const adminClient = createAdminClient();
+    const { data: coachMembership, error: coachMembershipError } = await adminClient
+      .from("memberships")
+      .select("id")
+      .eq("id", coach_membership_id)
+      .eq("tenant_id", membership.tenant_id)
+      .eq("is_active", true)
+      .in("role", [...COACH_ASSIGNABLE_ROLES])
+      .maybeSingle();
+
+    if (coachMembershipError) {
+      return NextResponse.json({ error: coachMembershipError.message }, { status: 500 });
+    }
+
+    if (!coachMembership) {
+      return NextResponse.json(
+        { error: "Invalid coach assignment for this tenant" },
+        { status: 400 }
+      );
+    }
+    coachMembershipId = coachMembership.id;
   }
 
   const { data, error } = await supabase
@@ -128,6 +157,7 @@ export async function POST(request: NextRequest) {
       tenant_id: membership.tenant_id,
       name: name.trim(),
       age_division: age_division ?? null,
+      coach_membership_id: coachMembershipId,
       birth_year: birth_year ?? null,
       roster_limit: roster_limit ?? 16,
     })

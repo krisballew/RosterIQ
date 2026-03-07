@@ -56,6 +56,7 @@ export default async function LineupPage() {
       tenant_id: tenantId,
       name,
       age_division: null,
+      coach_membership_id: null,
       birth_year: null,
       roster_limit: 16,
       created_at: new Date().toISOString(),

@@ -80,6 +80,7 @@ const EMPTY_FORM: PlayerFormData = {
 interface TeamFormData {
   name: string;
   age_division: string;
+  coach_membership_id: string;
   birth_year: string;
   roster_limit: string;
 }
@@ -87,8 +88,31 @@ interface TeamFormData {
 const EMPTY_TEAM_FORM: TeamFormData = {
   name: "",
   age_division: "",
+  coach_membership_id: "",
   birth_year: "",
   roster_limit: "16",
+};
+
+interface CoachOption {
+  membership_id: string;
+  name: string;
+  role: string;
+  email: string;
+}
+
+interface AdminUserOption {
+  id: string;
+  first_name?: string | null;
+  last_name?: string | null;
+  email?: string;
+  role?: string;
+  is_active?: boolean;
+}
+
+const COACH_LABELS: Record<string, string> = {
+  select_coach: "Select Coach",
+  academy_coach: "Academy Coach",
+  director_of_coaching: "Director of Coaching",
 };
 
 const STATUS_CONFIG: Record<PlayerStatus, { label: string; className: string }> = {
@@ -354,9 +378,10 @@ interface TeamFormDialogProps {
   title: string;
   onSubmit: (data: TeamFormData) => Promise<void>;
   submitLabel: string;
+  coachOptions: CoachOption[];
 }
 
-function TeamFormDialog({ open, onOpenChange, initialData, title, onSubmit, submitLabel }: TeamFormDialogProps) {
+function TeamFormDialog({ open, onOpenChange, initialData, title, onSubmit, submitLabel, coachOptions }: TeamFormDialogProps) {
   const [form, setForm] = useState<TeamFormData>({ ...EMPTY_TEAM_FORM, ...initialData });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -401,6 +426,25 @@ function TeamFormDialog({ open, onOpenChange, initialData, title, onSubmit, subm
           <div className="space-y-1">
             <Label htmlFor="t_limit">Roster Limit</Label>
             <Input id="t_limit" type="number" value={form.roster_limit} onChange={(e) => set("roster_limit", e.target.value)} placeholder="16" />
+          </div>
+          <div className="col-span-2 space-y-1">
+            <Label htmlFor="t_coach">Assigned Coach</Label>
+            <Select
+              value={form.coach_membership_id || "__none__"}
+              onValueChange={(v) => set("coach_membership_id", v === "__none__" ? "" : v)}
+            >
+              <SelectTrigger id="t_coach">
+                <SelectValue placeholder="Select a coach" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">- Unassigned -</SelectItem>
+                {coachOptions.map((coach) => (
+                  <SelectItem key={coach.membership_id} value={coach.membership_id}>
+                    {coach.name} ({COACH_LABELS[coach.role] ?? coach.role})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
         {error && <p className="text-sm text-red-600">{error}</p>}
@@ -1115,12 +1159,47 @@ export function RosterClient({ initialPlayers, initialTeams }: RosterClientProps
   const [editTeam, setEditTeam] = useState<Team | null>(null);
   const [deleteTeam, setDeleteTeam] = useState<Team | null>(null);
   const [deletingTeam, setDeletingTeam] = useState(false);
+  const [coachOptions, setCoachOptions] = useState<CoachOption[]>([]);
 
   // Import dialog
   const [importOpen, setImportOpen] = useState(false);
 
   // Age divisions dialog
   const [ageDivisionsOpen, setAgeDivisionsOpen] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    async function loadCoachOptions() {
+      try {
+        const res = await fetch("/api/app/admin/users");
+        if (!res.ok) return;
+        const json = await res.json();
+        const users: AdminUserOption[] = Array.isArray(json?.users) ? json.users : [];
+        const coaches: CoachOption[] = users
+          .filter(
+            (u) =>
+              u.is_active !== false &&
+              ["select_coach", "academy_coach", "director_of_coaching"].includes(u.role ?? "")
+          )
+          .map((u) => ({
+            membership_id: u.id,
+            name:
+              `${u.first_name ?? ""} ${u.last_name ?? ""}`.trim() ||
+              (u.email ?? "Unknown coach"),
+            role: u.role ?? "select_coach",
+            email: u.email ?? "",
+          }))
+          .sort((a, b) => a.name.localeCompare(b.name));
+        if (mounted) setCoachOptions(coaches);
+      } catch {
+        // Ignore load errors; team assignment still works without listing options.
+      }
+    }
+    void loadCoachOptions();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   // ── Stats ──────────────────────────────────────────────────
   const stats = useMemo(
@@ -1272,6 +1351,7 @@ export function RosterClient({ initialPlayers, initialTeams }: RosterClientProps
       body: JSON.stringify({
         name: data.name.trim(),
         age_division: data.age_division.trim() || null,
+        coach_membership_id: data.coach_membership_id || null,
         birth_year: data.birth_year ? Number(data.birth_year) : null,
         roster_limit: data.roster_limit ? Number(data.roster_limit) : 16,
       }),
@@ -1289,6 +1369,7 @@ export function RosterClient({ initialPlayers, initialTeams }: RosterClientProps
       body: JSON.stringify({
         name: data.name.trim(),
         age_division: data.age_division.trim() || null,
+        coach_membership_id: data.coach_membership_id || null,
         birth_year: data.birth_year ? Number(data.birth_year) : null,
         roster_limit: data.roster_limit ? Number(data.roster_limit) : 16,
       }),
@@ -1785,6 +1866,7 @@ export function RosterClient({ initialPlayers, initialTeams }: RosterClientProps
                   <tr>
                     <th className="px-4 py-2 text-left">Name</th>
                     <th className="px-4 py-2 text-left">Age Division</th>
+                    <th className="px-4 py-2 text-left">Coach</th>
                     <th className="px-4 py-2 text-left">Limit</th>
                     <th className="px-4 py-2 text-right">Actions</th>
                   </tr>
@@ -1794,6 +1876,9 @@ export function RosterClient({ initialPlayers, initialTeams }: RosterClientProps
                     <tr key={t.id} className="hover:bg-gray-50/60">
                       <td className="px-4 py-2 font-medium text-gray-900">{t.name}</td>
                       <td className="px-4 py-2 text-gray-600">{t.age_division ?? "—"}</td>
+                      <td className="px-4 py-2 text-gray-600">
+                        {coachOptions.find((c) => c.membership_id === t.coach_membership_id)?.name ?? "—"}
+                      </td>
                       <td className="px-4 py-2 text-gray-600">{t.roster_limit}</td>
                       <td className="px-4 py-2 text-right">
                         <div className="inline-flex gap-1">
@@ -1826,6 +1911,7 @@ export function RosterClient({ initialPlayers, initialTeams }: RosterClientProps
         title="Add Team"
         onSubmit={handleAddTeam}
         submitLabel="Add Team"
+        coachOptions={coachOptions}
       />
 
       {/* Edit team */}
@@ -1836,12 +1922,14 @@ export function RosterClient({ initialPlayers, initialTeams }: RosterClientProps
           initialData={{
             name: editTeam.name,
             age_division: editTeam.age_division ?? "",
+            coach_membership_id: editTeam.coach_membership_id ?? "",
             birth_year: editTeam.birth_year?.toString() ?? "",
             roster_limit: editTeam.roster_limit?.toString() ?? "16",
           }}
           title={`Edit — ${editTeam.name}`}
           onSubmit={handleEditTeam}
           submitLabel="Save Changes"
+          coachOptions={coachOptions}
         />
       )}
 

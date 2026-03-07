@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
+
+const COACH_ASSIGNABLE_ROLES = ["select_coach", "academy_coach", "director_of_coaching"] as const;
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -56,10 +59,44 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   if (error || !team) return NextResponse.json({ error }, { status });
 
   const body = await request.json();
-  const allowed = ["name", "age_division", "birth_year", "roster_limit"];
+  const allowed = ["name", "age_division", "coach_membership_id", "birth_year", "roster_limit"];
   const updates: Record<string, unknown> = {};
   for (const key of allowed) {
     if (key in body) updates[key] = body[key];
+  }
+
+  if ("coach_membership_id" in updates) {
+    const requestedCoachId = updates.coach_membership_id;
+    if (requestedCoachId === null || requestedCoachId === "") {
+      updates.coach_membership_id = null;
+    } else if (typeof requestedCoachId === "string") {
+      const adminClient = createAdminClient();
+      const { data: coachMembership, error: coachMembershipError } = await adminClient
+        .from("memberships")
+        .select("id")
+        .eq("id", requestedCoachId)
+        .eq("tenant_id", team.tenant_id)
+        .eq("is_active", true)
+        .in("role", [...COACH_ASSIGNABLE_ROLES])
+        .maybeSingle();
+
+      if (coachMembershipError) {
+        return NextResponse.json({ error: coachMembershipError.message }, { status: 500 });
+      }
+
+      if (!coachMembership) {
+        return NextResponse.json(
+          { error: "Invalid coach assignment for this team" },
+          { status: 400 }
+        );
+      }
+      updates.coach_membership_id = coachMembership.id;
+    } else {
+      return NextResponse.json(
+        { error: "coach_membership_id must be a string or null" },
+        { status: 400 }
+      );
+    }
   }
 
   if (!updates.name && Object.keys(updates).length === 0) {

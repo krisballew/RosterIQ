@@ -36,6 +36,8 @@ export interface Team {
   tenant_id: string;
   name: string;
   age_division: string | null;
+  /** Optional assigned coach membership id */
+  coach_membership_id: string | null;
   /** Eligibility birth year for the team */
   birth_year: number | null;
   roster_limit: number;
