@@ -11,6 +11,7 @@ import {
   MapPin,
   Shield,
   UserCheck,
+  UserCog,
   Layers,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -122,6 +123,27 @@ export function Sidebar({ isPlatformAdmin, isClubAdmin = false, pendingRequestsC
                       {pendingRequestsCount}
                     </span>
                   )}
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/app/admin/users"
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                    pathname === "/app/admin/users" || pathname.startsWith("/app/admin/users/")
+                      ? "bg-blue-50 text-blue-700"
+                      : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                  )}
+                >
+                  <UserCog
+                    className={cn(
+                      "h-4 w-4 shrink-0",
+                      pathname === "/app/admin/users" || pathname.startsWith("/app/admin/users/")
+                        ? "text-blue-600"
+                        : "text-gray-400"
+                    )}
+                  />
+                  User Administration
                 </Link>
               </li>
             </ul>
