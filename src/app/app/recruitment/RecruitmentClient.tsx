@@ -102,6 +102,7 @@ type Plan = {
 };
 
 type RecruitmentData = {
+  role: string;
   prospects: Prospect[];
   events: Event[];
   links: RegistrationLink[];
@@ -213,6 +214,7 @@ function CollapsibleSection({
 export function RecruitmentClient() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<RecruitmentData>({
+    role: "",
     prospects: [],
     events: [],
     links: [],
@@ -223,6 +225,8 @@ export function RecruitmentClient() {
     fieldSpaces: [],
     statuses: [],
   });
+
+  const isCoach = data.role === "select_coach" || data.role === "academy_coach";
 
   const [filters, setFilters] = useState<Filters>(defaultFilters);
   const [selectedProspectId, setSelectedProspectId] = useState("");
@@ -775,16 +779,18 @@ export function RecruitmentClient() {
           <p className="text-sm text-gray-500">Track prospects from first interest through evaluation, decision, and roster conversion.</p>
         </div>
         <div className="inline-flex rounded-lg border border-gray-200 p-1 bg-white shrink-0">
-          {[
+          {([
             ["pipeline", "Pipeline"],
-            ["intake", "Intake"],
-            ["planning", "Planning"],
+            ...(!isCoach ? [["intake", "Intake"]] : []),
+            ...(!isCoach ? [["planning", "Planning"]] : []),
             ["history", "History"],
-          ].map(([id, label]) => (
+          ] as [string, string][]).map(([id, label]) => (
             <button
               key={id}
               type="button"
-              className={`px-3 py-1.5 text-sm rounded-md ${activeView === id ? "bg-blue-600 text-white" : "text-gray-600 hover:text-gray-900"}`}
+              className={`px-3 py-1.5 text-sm rounded-md ${
+                activeView === id ? "bg-blue-600 text-white" : "text-gray-600 hover:text-gray-900"
+              }`}
               onClick={() => setActiveView(id as typeof activeView)}
             >
               {label}
@@ -920,6 +926,38 @@ export function RecruitmentClient() {
                   {data.prospects.length === 0 && <p className="text-sm text-gray-500 py-2">No prospects match current filters.</p>}
                 </div>
               </CollapsibleSection>
+
+              {/* Coaches see a read-only events list in Pipeline; managers see it under Intake */}
+              {isCoach && (
+                <CollapsibleSection title={`My Team Events${data.events.length > 0 ? ` (${data.events.length})` : ""}`}>
+                  <div className="space-y-1 pt-2">
+                    {data.events.map((ev) => {
+                      const team = data.teams.find((t) => t.id === ev.team_id);
+                      return (
+                        <div key={ev.id} className="rounded border border-gray-200 p-3 text-sm">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="font-medium text-gray-900">{ev.name}</p>
+                              <p className="text-xs text-gray-500 mt-0.5">
+                                {ev.event_type.replace("_", " ")}
+                                {team ? ` • ${team.name}` : ""}
+                                {ev.starts_at
+                                  ? ` • ${new Date(ev.starts_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })} ${new Date(ev.starts_at).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}`
+                                  : ""}
+                              </p>
+                              {ev.location && <p className="text-xs text-gray-400 mt-0.5">{ev.location}</p>}
+                            </div>
+                            {ev.season && <span className="text-xs text-gray-400 shrink-0">{ev.season}</span>}
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {data.events.length === 0 && (
+                      <p className="text-sm text-gray-500 py-2">No events scheduled for your teams yet.</p>
+                    )}
+                  </div>
+                </CollapsibleSection>
+              )}
 
               {selectedProspect && (
                 <CollapsibleSection title={`Workspace — ${selectedProspect.first_name} ${selectedProspect.last_name}`}>

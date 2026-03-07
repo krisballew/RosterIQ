@@ -124,11 +124,27 @@ function parseCsv(csv: string) {
   return rows;
 }
 
+const COACH_ROLES = ["select_coach", "academy_coach"] as const;
+type CoachRole = (typeof COACH_ROLES)[number];
+
 export async function GET(request: NextRequest) {
   const auth = await requireRecruitmentAccess(false);
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
-  const { supabase, tenantId } = auth;
+  const { supabase, tenantId, role, membershipId } = auth;
+  const isCoach = COACH_ROLES.includes(role as CoachRole);
+
+  // For coaches, scope all data to their assigned teams only
+  let coachTeamIds: string[] | null = null;
+  if (isCoach) {
+    const { data: coachTeams } = await supabase
+      .from("teams")
+      .select("id")
+      .eq("tenant_id", tenantId)
+      .eq("coach_membership_id", membershipId);
+    coachTeamIds = (coachTeams ?? []).map((t: { id: string }) => t.id);
+  }
+
   const q = request.nextUrl.searchParams.get("q")?.trim() ?? "";
   const status = request.nextUrl.searchParams.get("status")?.trim() ?? "";
   const ageDivision = request.nextUrl.searchParams.get("ageDivision")?.trim() ?? "";
@@ -149,7 +165,6 @@ export async function GET(request: NextRequest) {
   if (status) prospectsQuery = prospectsQuery.eq("status", status);
   if (ageDivision) prospectsQuery = prospectsQuery.eq("age_division", ageDivision);
   if (gender) prospectsQuery = prospectsQuery.eq("gender", gender);
-  if (teamId) prospectsQuery = prospectsQuery.eq("team_id", teamId);
   if (source) prospectsQuery = prospectsQuery.eq("recruiting_source", source);
   if (currentClub) prospectsQuery = prospectsQuery.ilike("current_club", `%${currentClub}%`);
 
@@ -163,18 +178,38 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  // Coaches: scope to their teams; otherwise apply optional team filter normally
+  if (coachTeamIds !== null) {
+    const ids = coachTeamIds.length > 0 ? coachTeamIds : ["00000000-0000-0000-0000-000000000000"];
+    prospectsQuery = prospectsQuery.in("team_id", ids);
+  } else if (teamId) {
+    prospectsQuery = prospectsQuery.eq("team_id", teamId);
+  }
+
+  let eventsQuery = supabase
+    .from("recruitment_events")
+    .select("*")
+    .eq("tenant_id", tenantId)
+    .order("starts_at", { ascending: false });
+
+  if (coachTeamIds !== null) {
+    const ids = coachTeamIds.length > 0 ? coachTeamIds : ["00000000-0000-0000-0000-000000000000"];
+    eventsQuery = eventsQuery.in("team_id", ids);
+  }
+
   const [prospectsRes, eventsRes, linksRes, evalsRes, statusRes, plansRes, teamsRes, fieldSpacesRes] = await Promise.all([
     prospectsQuery,
-    supabase.from("recruitment_events").select("*").eq("tenant_id", tenantId).order("starts_at", { ascending: false }),
+    eventsQuery,
     supabase.from("recruitment_registration_links").select("*").eq("tenant_id", tenantId).order("created_at", { ascending: false }),
     supabase.from("recruitment_evaluations").select("*").eq("tenant_id", tenantId).order("created_at", { ascending: false }),
     supabase.from("recruitment_status_history").select("*").eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(300),
-    supabase.from("recruitment_plans").select("*").eq("tenant_id", tenantId).order("updated_at", { ascending: false }),
+    isCoach ? Promise.resolve({ data: [] }) : supabase.from("recruitment_plans").select("*").eq("tenant_id", tenantId).order("updated_at", { ascending: false }),
     supabase.from("teams").select("id, name, age_division").eq("tenant_id", tenantId).order("name"),
     supabase.from("training_field_spaces").select("id, map_id, name, field_type, availability_status, training_field_maps(training_complexes(name))").eq("tenant_id", tenantId).eq("availability_status", "available").order("name"),
   ]);
 
   return NextResponse.json({
+    role,
     prospects: prospectsRes.data ?? [],
     events: eventsRes.data ?? [],
     links: linksRes.data ?? [],
