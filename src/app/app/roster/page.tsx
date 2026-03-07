@@ -29,6 +29,7 @@ export default async function RosterPage() {
     user_email: string;
     first_name?: string | null;
     last_name?: string | null;
+    role?: string | null;
   }> = [];
 
   if (membership?.tenant_id) {
@@ -46,9 +47,8 @@ export default async function RosterPage() {
         .order("name", { ascending: true }),
       supabase
         .from("memberships")
-        .select("id, user_email, first_name, last_name")
+        .select("id, user_email, first_name, last_name, role")
         .eq("tenant_id", membership.tenant_id)
-        .in("role", ["select_player", "academy_player"])
         .eq("is_active", true)
         .order("last_name", { ascending: true })
         .order("first_name", { ascending: true }),

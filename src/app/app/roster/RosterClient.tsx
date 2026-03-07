@@ -160,6 +160,7 @@ interface PlayerFormDialogProps {
     user_email: string;
     first_name?: string | null;
     last_name?: string | null;
+    role?: string | null;
   }>;
 }
 
@@ -347,13 +348,17 @@ function PlayerFormDialog({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="__none__">— No Account —</SelectItem>
-                {playerMemberships.map((m) => (
-                  <SelectItem key={m.id} value={m.id}>
-                    {m.first_name && m.last_name 
-                      ? `${m.first_name} ${m.last_name} (${m.user_email})`
-                      : m.user_email}
-                  </SelectItem>
-                ))}
+                {playerMemberships.map((m) => {
+                  const name = m.first_name && m.last_name 
+                    ? `${m.first_name} ${m.last_name}`
+                    : m.user_email;
+                  const roleLabel = m.role ? ` [${m.role.replace(/_/g, ' ')}]` : '';
+                  return (
+                    <SelectItem key={m.id} value={m.id}>
+                      {name}{roleLabel} ({m.user_email})
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
             <p className="text-xs text-gray-500">
@@ -1158,6 +1163,7 @@ interface RosterClientProps {
     user_email: string;
     first_name?: string | null;
     last_name?: string | null;
+    role?: string | null;
   }>;
 }
 
