@@ -3,6 +3,7 @@ import { recognize } from "tesseract.js";
 import { requireFieldAdminContext } from "../../_auth";
 
 export const runtime = "nodejs";
+const OCR_TIMEOUT_MS = 45000;
 
 type OcrLine = { text: string };
 type OcrResult = { data?: { lines?: OcrLine[]; text?: string } };
@@ -61,6 +62,7 @@ function extractCandidateLabels(lines: string[]): string[] {
 }
 
 export async function POST(request: NextRequest) {
+  const startedAt = Date.now();
   const auth = await requireFieldAdminContext();
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
@@ -89,7 +91,12 @@ export async function POST(request: NextRequest) {
   let lines: string[] = [];
 
   try {
-    const result = (await recognize(imageUrl, "eng")) as OcrResult;
+    const result = (await Promise.race([
+      recognize(imageUrl, "eng"),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error(`OCR timed out after ${OCR_TIMEOUT_MS / 1000}s`)), OCR_TIMEOUT_MS)
+      ),
+    ])) as OcrResult;
     const fromLines = (result.data?.lines ?? []).map((l) => l.text).filter(Boolean);
     const fromRaw = (result.data?.text ?? "")
       .split("\n")
@@ -99,13 +106,23 @@ export async function POST(request: NextRequest) {
     lines = fromLines.length > 0 ? fromLines : fromRaw;
   } catch (error) {
     const message = error instanceof Error ? error.message : "OCR failed";
-    return NextResponse.json({ error: `Unable to process image text: ${message}` }, { status: 422 });
+    const timedOut = message.toLowerCase().includes("timed out");
+    return NextResponse.json(
+      { error: `Unable to process image text: ${message}` },
+      { status: timedOut ? 504 : 422 }
+    );
   }
 
   const labels = extractCandidateLabels(lines);
 
   if (labels.length === 0) {
-    return NextResponse.json({ created: 0, skipped: 0, labels: [], message: "No field labels detected." });
+    return NextResponse.json({
+      created: 0,
+      skipped: 0,
+      labels: [],
+      duration_ms: Date.now() - startedAt,
+      message: "No field labels detected.",
+    });
   }
 
   const existingRes = await supabase
@@ -137,5 +154,6 @@ export async function POST(request: NextRequest) {
     created: toInsert.length,
     skipped: labels.length - toInsert.length,
     labels,
+    duration_ms: Date.now() - startedAt,
   });
 }

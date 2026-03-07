@@ -26,6 +26,8 @@ type Assignment = {
 };
 
 type OpenField = { field_id: string; label: string; open_time: string; close_time: string };
+type ToastTone = "success" | "error" | "info";
+type ToastItem = { id: number; message: string; tone: ToastTone };
 
 export function FieldsClient() {
   const [loading, setLoading] = useState(true);
@@ -64,6 +66,15 @@ export function FieldsClient() {
   const [assignmentNotes, setAssignmentNotes] = useState("");
 
   const [openAtLocal, setOpenAtLocal] = useState("");
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
+
+  function pushToast(message: string, tone: ToastTone = "info") {
+    const id = Date.now() + Math.floor(Math.random() * 1000);
+    setToasts((prev) => [...prev, { id, message, tone }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 5000);
+  }
 
   const fieldNameById = useMemo(() => new Map(fields.map((f) => [f.id, f.label])), [fields]);
   const teamNameById = useMemo(() => new Map(teams.map((t) => [t.id, t.name])), [teams]);
@@ -105,6 +116,7 @@ export function FieldsClient() {
     setError(null);
     setFieldMapMessage(null);
     try {
+      pushToast("Uploading map image...", "info");
       const fd = new FormData();
       fd.append("file", mapFile);
       const uploadRes = await fetch("/api/app/fields/maps/upload", { method: "POST", body: fd });
@@ -121,6 +133,7 @@ export function FieldsClient() {
 
       let extractSummary = "";
       if (autoExtractLabels) {
+        pushToast("Extracting labels from uploaded map...", "info");
         const extractRes = await fetch("/api/app/fields/maps/extract-labels", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -142,11 +155,13 @@ export function FieldsClient() {
       await loadDashboard();
       setFieldMapMessageType("success");
       setFieldMapMessage(`Map upload completed successfully.${extractSummary}`);
+      pushToast(`Map uploaded successfully.${extractSummary}`, "success");
     } catch (e) {
       const message = e instanceof Error ? e.message : "Failed to create map";
       setError(message);
       setFieldMapMessageType("error");
       setFieldMapMessage(`Upload failed: ${message}`);
+      pushToast(`Upload failed: ${message}`, "error");
     } finally {
       setCreatingMap(false);
     }
@@ -157,6 +172,7 @@ export function FieldsClient() {
     setFieldMapMessage(null);
     setExtractingMapId(mapId);
     try {
+      pushToast("Label extraction started...", "info");
       const res = await fetch("/api/app/fields/maps/extract-labels", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -167,11 +183,13 @@ export function FieldsClient() {
       await loadDashboard();
       setFieldMapMessageType("success");
       setFieldMapMessage(`Extraction finished: ${json.created ?? 0} labels created, ${json.skipped ?? 0} skipped.`);
+      pushToast(`Extraction finished: ${json.created ?? 0} created, ${json.skipped ?? 0} skipped.`, "success");
     } catch (e) {
       const message = e instanceof Error ? e.message : "Failed to extract labels";
       setError(message);
       setFieldMapMessageType("error");
       setFieldMapMessage(`Extraction failed: ${message}`);
+      pushToast(`Extraction failed: ${message}`, "error");
     } finally {
       setExtractingMapId(null);
     }
@@ -268,6 +286,7 @@ export function FieldsClient() {
 
   async function handlePublishAssignments() {
     setError(null);
+    pushToast("Publishing draft assignments...", "info");
     const res = await fetch("/api/app/fields/assignments/publish", { method: "POST" });
     const json = await res.json();
     if (!res.ok) {
@@ -275,7 +294,7 @@ export function FieldsClient() {
       return;
     }
     await loadDashboard();
-    alert(`Published ${json.published} assignments to ${json.coachesNotified} coaches.`);
+    pushToast(`Published ${json.published} assignments to ${json.coachesNotified} coaches.`, "success");
   }
 
   async function handleOpenFieldLookup() {
@@ -294,6 +313,23 @@ export function FieldsClient() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
+      <div className="fixed right-4 top-4 z-50 space-y-2">
+        {toasts.map((t) => (
+          <div
+            key={t.id}
+            className={
+              t.tone === "success"
+                ? "rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800 shadow"
+                : t.tone === "error"
+                  ? "rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 shadow"
+                  : "rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800 shadow"
+            }
+          >
+            {t.message}
+          </div>
+        ))}
+      </div>
+
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Field Assignments</h1>
