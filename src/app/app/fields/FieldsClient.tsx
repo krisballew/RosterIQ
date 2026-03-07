@@ -30,6 +30,8 @@ type OpenField = { field_id: string; label: string; open_time: string; close_tim
 export function FieldsClient() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [fieldMapMessage, setFieldMapMessage] = useState<string | null>(null);
+  const [fieldMapMessageType, setFieldMapMessageType] = useState<"success" | "info" | "error">("info");
 
   const [fieldMaps, setFieldMaps] = useState<FieldMap[]>([]);
   const [fields, setFields] = useState<FieldLabel[]>([]);
@@ -40,6 +42,7 @@ export function FieldsClient() {
 
   const [mapName, setMapName] = useState("");
   const [mapFile, setMapFile] = useState<File | null>(null);
+  const [mapFileInputKey, setMapFileInputKey] = useState(0);
   const [creatingMap, setCreatingMap] = useState(false);
   const [autoExtractLabels, setAutoExtractLabels] = useState(true);
   const [extractingMapId, setExtractingMapId] = useState<string | null>(null);
@@ -68,7 +71,7 @@ export function FieldsClient() {
   const loadDashboard = useCallback(async (atIso?: string) => {
     setError(null);
     const url = atIso ? `/api/app/fields/dashboard?at=${encodeURIComponent(atIso)}` : "/api/app/fields/dashboard";
-    const res = await fetch(url);
+    const res = await fetch(url, { cache: "no-store" });
     const json = await res.json();
     if (!res.ok) throw new Error(json.error ?? "Failed to load field dashboard");
 
@@ -100,6 +103,7 @@ export function FieldsClient() {
     if (!mapName.trim() || !mapFile) return;
     setCreatingMap(true);
     setError(null);
+    setFieldMapMessage(null);
     try {
       const fd = new FormData();
       fd.append("file", mapFile);
@@ -115,6 +119,7 @@ export function FieldsClient() {
       const createJson = await createRes.json();
       if (!createRes.ok) throw new Error(createJson.error ?? "Failed to create field map");
 
+      let extractSummary = "";
       if (autoExtractLabels) {
         const extractRes = await fetch("/api/app/fields/maps/extract-labels", {
           method: "POST",
@@ -128,13 +133,20 @@ export function FieldsClient() {
         if (!extractRes.ok) {
           throw new Error(extractJson.error ?? "Failed to extract field labels from map");
         }
+        extractSummary = ` Auto-extracted ${extractJson.created ?? 0} labels (${extractJson.skipped ?? 0} skipped).`;
       }
 
       setMapName("");
       setMapFile(null);
+      setMapFileInputKey((prev) => prev + 1);
       await loadDashboard();
+      setFieldMapMessageType("success");
+      setFieldMapMessage(`Map upload completed successfully.${extractSummary}`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to create map");
+      const message = e instanceof Error ? e.message : "Failed to create map";
+      setError(message);
+      setFieldMapMessageType("error");
+      setFieldMapMessage(`Upload failed: ${message}`);
     } finally {
       setCreatingMap(false);
     }
@@ -142,6 +154,7 @@ export function FieldsClient() {
 
   async function handleExtractLabelsForMap(mapId: string, imageUrl: string) {
     setError(null);
+    setFieldMapMessage(null);
     setExtractingMapId(mapId);
     try {
       const res = await fetch("/api/app/fields/maps/extract-labels", {
@@ -152,8 +165,13 @@ export function FieldsClient() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Failed to extract labels");
       await loadDashboard();
+      setFieldMapMessageType("success");
+      setFieldMapMessage(`Extraction finished: ${json.created ?? 0} labels created, ${json.skipped ?? 0} skipped.`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to extract labels");
+      const message = e instanceof Error ? e.message : "Failed to extract labels";
+      setError(message);
+      setFieldMapMessageType("error");
+      setFieldMapMessage(`Extraction failed: ${message}`);
     } finally {
       setExtractingMapId(null);
     }
@@ -298,6 +316,19 @@ export function FieldsClient() {
         <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
           <Upload className="h-4 w-4" /> Field Maps
         </h2>
+        {fieldMapMessage && (
+          <div
+            className={
+              fieldMapMessageType === "success"
+                ? "rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700"
+                : fieldMapMessageType === "error"
+                  ? "rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+                  : "rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700"
+            }
+          >
+            {fieldMapMessage}
+          </div>
+        )}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 items-end">
           <div className="space-y-1">
             <Label>Map Name</Label>
@@ -305,7 +336,7 @@ export function FieldsClient() {
           </div>
           <div className="space-y-1">
             <Label>Map Image</Label>
-            <Input type="file" accept="image/*" onChange={(e) => setMapFile(e.target.files?.[0] ?? null)} />
+            <Input key={mapFileInputKey} type="file" accept="image/*" onChange={(e) => setMapFile(e.target.files?.[0] ?? null)} />
           </div>
           <Button onClick={handleCreateMap} disabled={creatingMap || !mapFile || !mapName.trim()}>
             {creatingMap ? "Uploading..." : "Upload Field Map"}
