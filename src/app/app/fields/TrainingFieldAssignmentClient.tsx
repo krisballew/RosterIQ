@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Rnd } from "react-rnd";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -100,38 +100,46 @@ export function TrainingFieldAssignmentClient() {
   const [assignmentStart, setAssignmentStart] = useState("");
   const [assignmentEnd, setAssignmentEnd] = useState("");
 
-  function handleRotateStart(e: React.MouseEvent, spaceId: string) {
+  const spacesRef = useRef<FieldSpace[]>([]);
+
+  useEffect(() => {
+    spacesRef.current = spaces;
+  }, [spaces]);
+
+  function handleRotateStart(e: React.PointerEvent, spaceId: string) {
+    e.preventDefault();
     e.stopPropagation();
+
+    const mapContainer = document.getElementById("field-map-container");
+    if (!mapContainer) return;
+
     setRotatingSpaceId(spaceId);
-    
-    const mapContainer = document.getElementById('field-map-container') as HTMLElement;
-      if (!mapContainer) return;
-    
-    const handleRotate = (ev: MouseEvent) => {
-      const space = spaces.find((s) => s.id === spaceId);
-      if (!space || !mapContainer) return;
-      
+
+    let latestRotation = spacesRef.current.find((s) => s.id === spaceId)?.rotation ?? 0;
+
+    const handleRotate = (ev: PointerEvent) => {
+      const space = spacesRef.current.find((s) => s.id === spaceId);
+      if (!space) return;
+
       const containerRect = mapContainer.getBoundingClientRect();
       const centerX = containerRect.left + (space.x + space.width / 2) * zoom;
       const centerY = containerRect.top + (space.y + space.height / 2) * zoom;
       const angle = Math.atan2(ev.clientY - centerY, ev.clientX - centerX) * (180 / Math.PI) + 90;
       const normalizedAngle = ((angle % 360) + 360) % 360;
-      
+
+      latestRotation = normalizedAngle;
       setSpaces((prev) => prev.map((s) => (s.id === spaceId ? { ...s, rotation: normalizedAngle } : s)));
     };
-    
+
     const handleRotateEnd = () => {
-      const space = spaces.find((s) => s.id === spaceId);
-      if (space) {
-        void patchSpace(spaceId, { rotation: space.rotation });
-      }
+      void patchSpace(spaceId, { rotation: latestRotation });
       setRotatingSpaceId(null);
-      document.removeEventListener("mousemove", handleRotate);
-      document.removeEventListener("mouseup", handleRotateEnd);
+      window.removeEventListener("pointermove", handleRotate);
+      window.removeEventListener("pointerup", handleRotateEnd);
     };
-    
-    document.addEventListener("mousemove", handleRotate);
-    document.addEventListener("mouseup", handleRotateEnd);
+
+    window.addEventListener("pointermove", handleRotate);
+    window.addEventListener("pointerup", handleRotateEnd);
   }
 
   const selectedMap = maps.find((m) => m.id === selectedMapId) ?? null;
@@ -441,6 +449,7 @@ export function TrainingFieldAssignmentClient() {
               <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-4">
                 <div className="overflow-auto rounded-lg border border-gray-200 bg-gray-100 p-2">
                   <div
+                    id="field-map-container"
                     className="relative origin-top-left"
                     style={{
                       width: selectedMap.canvas_width,
@@ -460,11 +469,11 @@ export function TrainingFieldAssignmentClient() {
                     {filteredSpaces.map((space) => (
                       <Rnd
                         key={space.id}
-                                                data-space-id={space.id}
+                        cancel=".rotate-handle"
                         bounds="parent"
                         position={{ x: Number(space.x), y: Number(space.y) }}
                         size={{ width: Number(space.width), height: Number(space.height) }}
-                                                disableDragging={rotatingSpaceId === space.id}
+                        disableDragging={rotatingSpaceId === space.id}
                         onDragStop={(_, d) => {
                           void patchSpace(space.id, { x: d.x, y: d.y });
                         }}
@@ -499,24 +508,26 @@ export function TrainingFieldAssignmentClient() {
                         <span className="px-2 py-1 rounded bg-white/85 text-xs font-semibold text-gray-900 pointer-events-none">
                           {space.name}
                         </span>
-                                              {(selectedSpaceId === space.id || rotatingSpaceId === space.id) && (
-                                                <div
-                                                  onMouseDown={(e) => handleRotateStart(e, space.id)}
-                                                  style={{
-                                                    position: "absolute",
-                                                    top: -8,
-                                                    right: -8,
-                                                    width: 20,
-                                                    height: 20,
-                                                    borderRadius: "50%",
-                                                    background: "#2563eb",
-                                                    border: "2px solid white",
-                                                    cursor: "grab",
-                                                    boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
-                                                    zIndex: 30,
-                                                  }}
-                                                  title="Drag to rotate"
-                                                >
+                        {(selectedSpaceId === space.id || rotatingSpaceId === space.id) && (
+                          <div
+                            className="rotate-handle"
+                            onPointerDown={(e) => handleRotateStart(e, space.id)}
+                            style={{
+                              position: "absolute",
+                              top: -8,
+                              right: -8,
+                              width: 20,
+                              height: 20,
+                              borderRadius: "50%",
+                              background: "#2563eb",
+                              border: "2px solid white",
+                              cursor: "grab",
+                              boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
+                              zIndex: 30,
+                              touchAction: "none",
+                            }}
+                            title="Drag to rotate"
+                          >
                                                   <svg
                                                     width="16"
                                                     height="16"
@@ -531,8 +542,8 @@ export function TrainingFieldAssignmentClient() {
                                                       strokeLinecap="round"
                                                     />
                                                   </svg>
-                                                </div>
-                                              )}
+                          </div>
+                        )}
                       </Rnd>
                     ))}
                   </div>
