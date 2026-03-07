@@ -20,6 +20,7 @@ type LinkData = {
     id: string;
     name: string;
     logo_url: string | null;
+    timezone: string | null;
   };
   event: {
     id: string;
@@ -227,12 +228,20 @@ export default function RegisterPage() {
             <div className="mt-4 space-y-1 text-sm text-gray-600">
               <p><strong>Event:</strong> {linkData.event.name}</p>
               {linkData.event.location && <p><strong>Location:</strong> {linkData.event.location}</p>}
-              {linkData.event.starts_at && (
-                <p><strong>Date:</strong> {new Date(linkData.event.starts_at).toLocaleDateString(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</p>
-              )}
-              {linkData.event.starts_at && (
-                <p><strong>Time:</strong> {new Date(linkData.event.starts_at).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}{linkData.event.ends_at ? ` – ${new Date(linkData.event.ends_at).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}` : ""}</p>
-              )}
+              {linkData.event.starts_at && (() => {
+                const tz = linkData.tenant.timezone ?? undefined;
+                return (
+                  <>
+                    <p><strong>Date:</strong> {new Date(linkData.event.starts_at).toLocaleDateString(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: tz })}</p>
+                    <p>
+                      <strong>Time:</strong>{" "}
+                      {new Date(linkData.event.starts_at).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", timeZone: tz })}
+                      {linkData.event.ends_at ? ` – ${new Date(linkData.event.ends_at).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", timeZone: tz })}` : ""}
+                      {tz ? ` (${new Intl.DateTimeFormat(undefined, { timeZone: tz, timeZoneName: "short" }).formatToParts(new Date(linkData.event.starts_at)).find((p) => p.type === "timeZoneName")?.value ?? ""})` : ""}
+                    </p>
+                  </>
+                );
+              })()}
             </div>
           )}
         </div>

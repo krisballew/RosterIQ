@@ -33,17 +33,24 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-const TIMEZONES = [
-  "America/Chicago",
-  "America/New_York",
-  "America/Denver",
-  "America/Los_Angeles",
-  "America/Phoenix",
-  "America/Anchorage",
-  "Pacific/Honolulu",
-  "Europe/London",
-  "Europe/Paris",
-  "Asia/Tokyo",
+const TIMEZONES: { value: string; label: string }[] = [
+  // United States
+  { value: "America/New_York",    label: "Eastern Time — New York, NY / Miami, FL / Atlanta, GA" },
+  { value: "America/Chicago",     label: "Central Time — Chicago, IL / Dallas, TX / Houston, TX" },
+  { value: "America/Denver",      label: "Mountain Time — Denver, CO / Salt Lake City, UT" },
+  { value: "America/Phoenix",     label: "Mountain Time (no DST) — Phoenix, AZ" },
+  { value: "America/Los_Angeles", label: "Pacific Time — Los Angeles, CA / Seattle, WA / Portland, OR" },
+  { value: "America/Anchorage",   label: "Alaska Time — Anchorage, AK" },
+  { value: "Pacific/Honolulu",    label: "Hawaii Time — Honolulu, HI" },
+  // Canada
+  { value: "America/Toronto",     label: "Eastern Time — Toronto, ON" },
+  { value: "America/Vancouver",   label: "Pacific Time — Vancouver, BC" },
+  // Europe
+  { value: "Europe/London",       label: "GMT/BST — London, UK" },
+  { value: "Europe/Paris",        label: "Central European Time — Paris, FR / Berlin, DE" },
+  // Asia / Pacific
+  { value: "Asia/Tokyo",          label: "Japan Time — Tokyo, JP" },
+  { value: "Australia/Sydney",    label: "Australian Eastern Time — Sydney, AU" },
 ];
 
 export interface TenantWithCodes {
@@ -186,8 +193,8 @@ function CreateForm({ onCreated, onCancel }: CreateFormProps) {
                 </SelectTrigger>
                 <SelectContent>
                   {TIMEZONES.map((tz) => (
-                    <SelectItem key={tz} value={tz}>
-                      {tz}
+                    <SelectItem key={tz.value} value={tz.value}>
+                      {tz.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -342,8 +349,8 @@ function EditRow({ tenant, onUpdated, onClose }: EditRowProps) {
             </SelectTrigger>
             <SelectContent>
               {TIMEZONES.map((tz) => (
-                <SelectItem key={tz} value={tz}>
-                  {tz}
+                <SelectItem key={tz.value} value={tz.value}>
+                  {tz.label}
                 </SelectItem>
               ))}
             </SelectContent>

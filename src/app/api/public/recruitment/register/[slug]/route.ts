@@ -28,7 +28,7 @@ export async function GET(
   // Fetch tenant information
   const { data: tenant } = await admin
     .from("tenants")
-    .select("id, name, logo_url")
+    .select("id, name, logo_url, timezone")
     .eq("id", link.tenant_id)
     .single();
 
