@@ -8,6 +8,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { 
+  BookOpen, Video, FileText, Newspaper, Users, User, 
+  Star, Eye, Clock, UserPlus, Calendar, Send,
+  GraduationCap, Target, ClipboardList, Search
+} from "lucide-react";
 import type { TrainingContent, TrainingAssignment,Player, Team } from "@/types/database";
 
 type ContentWithAssignments = TrainingContent & {
@@ -178,232 +183,343 @@ export default function CoachTrainingClient() {
     return true;
   });
 
+  const getContentIcon = (type: string) => {
+    switch (type) {
+      case 'video': return <Video className="h-5 w-5" />;
+      case 'document': return <FileText className="h-5 w-5" />;
+      case 'article': return <Newspaper className="h-5 w-5" />;
+      case 'lesson': return <BookOpen className="h-5 w-5" />;
+      default: return <FileText className="h-5 w-5" />;
+    }
+  };
+
   if (loading) {
     return (
-      <div className="p-8">
-        <div className="text-center">Loading...</div>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <GraduationCap className="h-12 w-12 text-blue-600 mx-auto mb-4 animate-pulse" />
+          <div className="text-lg text-gray-600">Loading training center...</div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="p-8 space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Training Center</h1>
-      </div>
-
-      {/* View Mode Tabs */}
-      <div className="flex gap-2 border-b">
-        <button
-          onClick={() => setViewMode("browse")}
-          className={`px-4 py-2 font-medium border-b-2 transition-colors ${
-            viewMode === "browse"
-              ? "border-blue-600 text-blue-600"
-              : "border-transparent text-gray-600 hover:text-gray-900"
-          }`}
-        >
-          Player Training Library
-        </button>
-        <button
-          onClick={() => setViewMode("coach-library")}
-          className={`px-4 py-2 font-medium border-b-2 transition-colors ${
-            viewMode === "coach-library"
-              ? "border-blue-600 text-blue-600"
-              : "border-transparent text-gray-600 hover:text-gray-900"
-          }`}
-        >
-          Coach Education
-        </button>
-        <button
-          onClick={() => setViewMode("assignments")}
-          className={`px-4 py-2 font-medium border-b-2 transition-colors ${
-            viewMode === "assignments"
-              ? "border-blue-600 text-blue-600"
-              : "border-transparent text-gray-600 hover:text-gray-900"
-          }`}
-        >
-          My Assignments ({assignments.length})
-        </button>
-      </div>
-
-      {viewMode !== "assignments" && (
-        <>
-          {/* Search */}
-          <Card className="p-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label>Search</Label>
-                <Input
-                  placeholder="Search training content..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+      <div className="p-6 md:p-8 space-y-6">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg">
+                <GraduationCap className="h-6 w-6 text-white" />
               </div>
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Training Center</h1>
             </div>
-          </Card>
-
-          {/* Content Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredContent.map((item) => (
-              <Card key={item.id} className="p-4 space-y-3">
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-lg">{item.title}</h3>
-                    {item.description && (
-                      <p className="text-sm text-gray-600 line-clamp-2">{item.description}</p>
-                    )}
-                  </div>
-                  {item.thumbnail_url && (
-                    <img
-                      src={item.thumbnail_url}
-                      alt={item.title}
-                      className="w-16 h-16 object-cover rounded ml-2"
-                    />
-                  )}
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  <Badge variant="outline">{item.content_type}</Badge>
-                  <Badge variant="outline">{item.audience}</Badge>
-                  {item.is_featured && <Badge variant="default">Featured</Badge>}
-                </div>
-
-                {item.tags && item.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-1">
-                    {item.tags.slice(0, 3).map((tag) => (
-                      <span key={tag} className="text-xs bg-gray-100 px-2 py-1 rounded">
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                <div className="text-sm text-gray-500">
-                  {item.duration_minutes && <span>{item.duration_minutes} min</span>}
-                  {item.view_count > 0 && <span className="ml-2">• {item.view_count} views</span>}
-                </div>
-
-                {viewMode === "browse" && (
-                  <div className="flex gap-2 pt-2">
-                    <Button size="sm" onClick={() => openAssignDialog(item)} className="flex-1">
-                      Assign to Player/Team
-                    </Button>
-                  </div>
-                )}
-              </Card>
-            ))}
+            <p className="text-gray-600">Browse content and assign training to your players</p>
           </div>
+        </div>
 
-          {filteredContent.length === 0 && (
-            <Card className="p-8 text-center text-gray-500">
-              <p>No training content found.</p>
+        {/* View Mode Tabs */}
+        <Card className="p-1 bg-white/80 backdrop-blur shadow-lg border-0">
+          <div className="flex gap-1">
+            <button
+              onClick={() => setViewMode("browse")}
+              className={`flex-1 px-4 py-3 font-medium rounded-lg transition-all flex items-center justify-center gap-2 ${
+                viewMode === "browse"
+                  ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg"
+                  : "text-gray-600 hover:bg-gray-100"
+              }`}
+            >
+              <Target className="h-4 w-4" /> Player Training Library
+            </button>
+            <button
+              onClick={() => setViewMode("coach-library")}
+              className={`flex-1 px-4 py-3 font-medium rounded-lg transition-all flex items-center justify-center gap-2 ${
+                viewMode === "coach-library"
+                  ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg"
+                  : "text-gray-600 hover:bg-gray-100"
+              }`}
+            >
+              <GraduationCap className="h-4 w-4" /> Coach Education
+            </button>
+            <button
+              onClick={() => setViewMode("assignments")}
+              className={`flex-1 px-4 py-3 font-medium rounded-lg transition-all flex items-center justify-center gap-2 ${
+                viewMode === "assignments"
+                  ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg"
+                  : "text-gray-600 hover:bg-gray-100"
+              }`}
+            >
+              <ClipboardList className="h-4 w-4" /> My Assignments 
+              <Badge className="ml-1">{assignments.length}</Badge>
+            </button>
+          </div>
+        </Card>
+
+        {viewMode !== "assignments" && (
+          <>
+            {/* Search */}
+            <Card className="p-4 shadow-lg border-0 bg-white/80 backdrop-blur">
+              <Label className="text-sm font-medium text-gray-700 flex items-center gap-1.5 mb-2">
+                <Search className="h-4 w-4" /> Search Training Content
+              </Label>
+              <Input
+                placeholder="Search training content..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
             </Card>
-          )}
-        </>
-      )}
+
+            {/* Content Grid */}
+            {filteredContent.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredContent.map((item) => (
+                  <Card key={item.id} className="group overflow-hidden border-0 shadow-lg hover:shadow-2xl transition-all duration-300 bg-white">
+                    {/* Thumbnail */}
+                    <div className="relative h-40 overflow-hidden">
+                      {item.thumbnail_url ? (
+                        <img
+                          src={item.thumbnail_url}
+                          alt={item.title}
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-gradient-to-br from-blue-500 via-purple-500 to-pink-600 flex items-center justify-center">
+                          <div className="text-white text-5xl opacity-80">
+                            {getContentIcon(item.content_type)}
+                          </div>
+                        </div>
+                      )}
+                      {item.is_featured && (
+                        <div className="absolute top-2 right-2 px-2.5 py-1 bg-yellow-400 text-yellow-900 rounded-full text-xs font-bold flex items-center gap-1 shadow-lg">
+                          <Star className="h-3 w-3" /> Featured
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="p-4 space-y-3">
+                      <div>
+                        <h3 className="font-bold text-lg text-gray-900 line-clamp-2 min-h-[3.5rem]">{item.title}</h3>
+                        {item.description && (
+                          <p className="text-sm text-gray-600 line-clamp-2 mt-1">{item.description}</p>
+                        )}
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        <Badge variant="outline" className="gap-1">
+                          {getContentIcon(item.content_type)}
+                          <span className="capitalize">{item.content_type}</span>
+                        </Badge>
+                        <Badge variant="outline" className="gap-1">
+                          {item.audience === 'both' ? <Users className="h-3.5 w-3.5" /> : <User className="h-3.5 w-3.5" />}
+                          <span className="capitalize">{item.audience}</span>
+                        </Badge>
+                      </div>
+
+                      {item.tags && item.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {item.tags.slice(0, 2).map((tag) => (
+                            <span key={tag} className="text-xs bg-purple-50 text-purple-700 px-2.5 py-1 rounded-full font-medium">
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="flex items-center gap-3 text-sm text-gray-500 pt-2 border-t">
+                        {item.duration_minutes && (
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-4 w-4" /> {item.duration_minutes}m
+                          </span>
+                        )}
+                        {item.view_count > 0 && (
+                          <span className="flex items-center gap-1">
+                            <Eye className="h-4 w-4" /> {item.view_count}
+                          </span>
+                        )}
+                      </div>
+
+                      {viewMode === "browse" && (
+                        <Button 
+                          onClick={() => openAssignDialog(item)} 
+                          className="w-full gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                        >
+                          <UserPlus className="h-4 w-4" /> Assign to Player/Team
+                        </Button>
+                      )}
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <Card className="p-12 text-center border-2 border-dashed border-gray-300 bg-gray-50/50">
+                <BookOpen className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">No content found</h3>
+                <p className="text-gray-600">Try adjusting your search query</p>
+              </Card>
+            )}
+          </>
+        )}
 
       {viewMode === "assignments" && (
         <div className="space-y-4">
-          {assignments.length === 0 && (
-            <Card className="p-8 text-center text-gray-500">
-              <p>No assignments yet. Browse the training library to assign content to your players.</p>
+          {assignments.length === 0 ? (
+            <Card className="p-12 text-center border-2 border-dashed border-gray-300 bg-gray-50/50">
+              <ClipboardList className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">No assignments yet</h3>
+              <p className="text-gray-600 mb-4">Browse the training library to assign content to your players</p>
+              <Button onClick={() => setViewMode("browse")} className="gap-2">
+                <Target className="h-4 w-4" /> Browse Training Library
+              </Button>
             </Card>
-          )}
-
-          {assignments.map((assignment) => (
-            <Card key={assignment.id} className="p-4">
-              <div className="flex justify-between items-start">
-                <div className="flex-1">
-                  <h3 className="font-semibold text-lg">
-                    {assignment.training_content?.title || "Untitled"}
-                  </h3>
-                  <div className="text-sm text-gray-600 mt-1">
-                    Assigned to:{" "}
-                    {assignment.player
-                      ? `${assignment.player.first_name} ${assignment.player.last_name}`
-                      : assignment.team
-                      ? assignment.team.name
-                      : "Unknown"}
-                  </div>
-                  {assignment.assignment_note && (
-                    <p className="text-sm text-gray-600 mt-2">{assignment.assignment_note}</p>
-                  )}
-                  <div className="flex gap-4 mt-2 text-sm">
-                    <span className="text-gray-500">
-                      Assigned: {new Date(assignment.assigned_at).toLocaleDateString()}
-                    </span>
-                    {assignment.due_date && (
-                      <span
-                        className={
-                          new Date(assignment.due_date) < new Date()
-                            ? "text-red-600 font-medium"
-                            : "text-gray-500"
-                        }
-                      >
-                        Due: {new Date(assignment.due_date).toLocaleDateString()}
-                      </span>
+          ) : (
+            assignments.map((assignment) => (
+              <Card key={assignment.id} className="p-5 shadow-lg border-0 hover:shadow-xl transition-shadow bg-white">
+                <div className="flex justify-between items-start gap-4">
+                  <div className="flex-1">
+                    <div className="flex items-start gap-3 mb-2">
+                      {assignment.training_content?.thumbnail_url ? (
+                        <img 
+                          src={assignment.training_content.thumbnail_url} 
+                          alt="" 
+                          className="w-16 h-16 object-cover rounded-lg shadow"
+                        />
+                      ) : (
+                        <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                          <BookOpen className="h-7 w-7 text-white" />
+                        </div>
+                      )}
+                      <div className="flex-1">
+                        <h3 className="font-bold text-lg text-gray-900">
+                          {assignment.training_content?.title || "Untitled"}
+                        </h3>
+                        <div className="flex items-center gap-2 mt-1 text-sm text-gray-600">
+                          <Users className="h-4 w-4" />
+                          <span>Assigned to: {
+                            assignment.player
+                              ? `${assignment.player.first_name} ${assignment.player.last_name}`
+                              : assignment.team
+                              ? assignment.team.name
+                              : "Unknown"
+                          }</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {assignment.assignment_note && (
+                      <div className="mt-3 p-3 bg-blue-50 border-l-4 border-blue-500 rounded">
+                        <p className="text-sm text-gray-700">
+                          <span className="font-semibold">Note:</span> {assignment.assignment_note}
+                        </p>
+                      </div>
                     )}
+                    
+                    <div className="flex flex-wrap gap-4 mt-3 text-sm text-gray-600">
+                      <span className="flex items-center gap-1.5">
+                        <Calendar className="h-4 w-4" />
+                        Assigned: {new Date(assignment.assigned_at).toLocaleDateString()}
+                      </span>
+                      {assignment.due_date && (
+                        <span
+                          className={`flex items-center gap-1.5 ${
+                            new Date(assignment.due_date) < new Date()
+                              ? "text-red-600 font-semibold"
+                              : "text-gray-600"
+                          }`}
+                        >
+                          <Calendar className="h-4 w-4" />
+                          Due: {new Date(assignment.due_date).toLocaleDateString()}
+                        </span>
+                      )}
+                      {assignment.training_content?.duration_minutes && (
+                        <span className="flex items-center gap-1.5">
+                          <Clock className="h-4 w-4" />
+                          {assignment.training_content.duration_minutes}m
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div className="flex flex-col gap-2">
+                    <Badge 
+                      variant={assignment.is_required ? "default" : "secondary"}
+                      className="justify-center"
+                    >
+                      {assignment.is_required ? "Required" : "Recommended"}
+                    </Badge>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => handleDeleteAssignment(assignment.id)}
+                      className="gap-1.5"
+                    >
+                      <UserPlus className="h-4 w-4 rotate-45" /> Remove
+                    </Button>
                   </div>
                 </div>
-                <div className="flex flex-col gap-2 ml-4">
-                  <Badge variant={assignment.is_required ? "default" : "secondary"}>
-                    {assignment.is_required ? "Required" : "Recommended"}
-                  </Badge>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    onClick={() => handleDeleteAssignment(assignment.id)}
-                  >
-                    Remove
-                  </Button>
-                </div>
-              </div>
-            </Card>
-          ))}
+              </Card>
+            ))
+          )}
         </div>
       )}
 
       {/* Assignment Dialog */}
       <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
-        <div className="space-y-4">
-          <h2 className="text-2xl font-bold">Assign Training Content</h2>
+        <div className="space-y-5">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg">
+              <Send className="h-5 w-5 text-white" />
+            </div>
+            <h2 className="text-2xl font-bold">Assign Training Content</h2>
+          </div>
 
           {selectedContent && (
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <h3 className="font-semibold">{selectedContent.title}</h3>
+            <Card className="p-4 bg-gradient-to-br from-blue-50 to-purple-50 border-blue-200">
+              <div className="flex items-center gap-1.5 text-blue-700 mb-2">
+                <BookOpen className="h-4 w-4" />
+                <span className="text-sm font-semibold">Content</span>
+              </div>
+              <h3 className="font-bold text-gray-900">{selectedContent.title}</h3>
               {selectedContent.description && (
-                <p className="text-sm text-gray-600 mt-1">{selectedContent.description}</p>
+                <p className="text-sm text-gray-700 mt-1">{selectedContent.description}</p>
               )}
-            </div>
+            </Card>
           )}
 
           <div className="space-y-4">
             <div>
-              <Label>Assign To</Label>
+              <Label className="font-semibold text-gray-900 flex items-center gap-1.5">
+                <Users className="h-4 w-4" /> Assign To
+              </Label>
               <div className="flex gap-4 mt-2">
-                <label className="flex items-center gap-2">
+                <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="radio"
                     checked={assignTo === "player"}
                     onChange={() => setAssignTo("player")}
+                    className="w-4 h-4 text-blue-600"
                   />
-                  <span>Individual Player</span>
+                  <span className="font-medium">Individual Player</span>
                 </label>
-                <label className="flex items-center gap-2">
+                <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="radio"
                     checked={assignTo === "team"}
                     onChange={() => setAssignTo("team")}
+                    className="w-4 h-4 text-blue-600"
                   />
-                  <span>Entire Team</span>
+                  <span className="font-medium">Entire Team</span>
                 </label>
               </div>
             </div>
 
             {assignTo === "player" && (
               <div>
-                <Label>Select Player *</Label>
-                <Select value={selectedPlayerId} onValueChange={setSelectedPlayerId}>
+                <Label className="font-semibold flex items-center gap-1.5">
+                  <User className="h-4 w-4" /> Select Player *
+                </Label>
+                <Select value={selectedPlayerId} onValueChange={setSelectedPlayerId} className="mt-1.5">
                   <option value="">Choose a player...</option>
                   {players.map((player) => (
                     <option key={player.id} value={player.id}>
@@ -416,8 +532,10 @@ export default function CoachTrainingClient() {
 
             {assignTo === "team" && (
               <div>
-                <Label>Select Team *</Label>
-                <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
+                <Label className="font-semibold flex items-center gap-1.5">
+                  <Users className="h-4 w-4" /> Select Team *
+                </Label>
+                <Select value={selectedTeamId} onValueChange={setSelectedTeamId} className="mt-1.5">
                   <option value="">Choose a team...</option>
                   {teams.map((team) => (
                     <option key={team.id} value={team.id}>
@@ -429,9 +547,9 @@ export default function CoachTrainingClient() {
             )}
 
             <div>
-              <Label>Note to Player (Optional)</Label>
+              <Label className="font-semibold">Note to Player (Optional)</Label>
               <textarea
-                className="w-full border rounded-md p-2 min-h-[80px]"
+                className="w-full border rounded-lg p-3 min-h-[90px] mt-1.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 value={assignmentNote}
                 onChange={(e) => setAssignmentNote(e.target.value)}
                 placeholder="Add a message about why you're assigning this content..."
@@ -439,34 +557,44 @@ export default function CoachTrainingClient() {
             </div>
 
             <div>
-              <Label>Due Date (Optional)</Label>
+              <Label className="font-semibold flex items-center gap-1.5">
+                <Calendar className="h-4 w-4" /> Due Date (Optional)
+              </Label>
               <Input
                 type="date"
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
+                className="mt-1.5"
               />
             </div>
 
-            <div>
-              <label className="flex items-center gap-2">
+            <div className="pt-2">
+              <label className="flex items-center gap-2 cursor-pointer p-3 rounded-lg hover:bg-gray-50 transition-colors">
                 <input
                   type="checkbox"
                   checked={isRequired}
                   onChange={(e) => setIsRequired(e.target.checked)}
+                  className="w-4 h-4 text-blue-600"
                 />
-                <span>Required (unchecked = recommended)</span>
+                <div>
+                  <span className="font-semibold text-gray-900">Required</span>
+                  <p className="text-sm text-gray-600">Uncheck to mark as recommended instead</p>
+                </div>
               </label>
             </div>
           </div>
 
-          <div className="flex gap-2 justify-end pt-4 border-t">
+          <div className="flex gap-3 justify-end pt-4 border-t">
             <Button variant="outline" onClick={() => setAssignDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleAssign}>Create Assignment</Button>
+            <Button onClick={handleAssign} className="gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
+              <Send className="h-4 w-4" /> Create Assignment
+            </Button>
           </div>
         </div>
       </Dialog>
+      </div>
     </div>
   );
 }

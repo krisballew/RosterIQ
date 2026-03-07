@@ -8,6 +8,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { 
+  BookOpen, Video, FileText, Newspaper, Users, User, 
+  Star, Eye, Clock, Edit, Trash2, Plus, Search,
+  FolderOpen, Tag, TrendingUp, Filter
+} from "lucide-react";
 import type {
   TrainingContent,
   TrainingCategory,
@@ -304,160 +309,300 @@ export default function TrainingLibraryClient() {
     return true;
   });
 
+  const getContentIcon = (type: string) => {
+    switch (type) {
+      case 'video': return <Video className="h-5 w-5" />;
+      case 'document': return <FileText className="h-5 w-5" />;
+      case 'article': return <Newspaper className="h-5 w-5" />;
+      case 'lesson': return <BookOpen className="h-5 w-5" />;
+      default: return <FileText className="h-5 w-5" />;
+    }
+  };
+
+  const stats = {
+    total: content.length,
+    published: content.filter(c => c.is_published).length,
+    draft: content.filter(c => !c.is_published).length,
+    featured: content.filter(c => c.is_featured).length
+  };
+
   if (loading) {
     return (
-      <div className="p-8">
-        <div className="text-center">Loading...</div>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <BookOpen className="h-12 w-12 text-blue-600 mx-auto mb-4 animate-pulse" />
+          <div className="text-lg text-gray-600">Loading training library...</div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="p-8 space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Training Library</h1>
-        <div className="space-x-2">
-          <Button onClick={() => openCategoryDialog()}>Add Category</Button>
-          <Button onClick={() => openContentDialog()}>Add Content</Button>
-        </div>
-      </div>
-
-      {/* Categories Section */}
-      <Card className="p-4">
-        <h2 className="text-xl font-semibold mb-4">Categories</h2>
-        <div className="flex flex-wrap gap-2">
-          {categories.map((cat) => (
-            <div key={cat.id} className="flex items-center gap-2 border rounded-lg px-3 py-2">
-              <span>{cat.name}</span>
-              <button
-                onClick={() => openCategoryDialog(cat)}
-                className="text-blue-600 hover:underline text-sm"
-              >
-                Edit
-              </button>
-              <button
-                onClick={() => handleDeleteCategory(cat.id)}
-                className="text-red-600 hover:underline text-sm"
-              >
-                Delete
-              </button>
-            </div>
-          ))}
-          {categories.length === 0 && (
-            <p className="text-gray-500">No categories yet. Create one to organize your content.</p>
-          )}
-        </div>
-      </Card>
-
-      {/* Filters */}
-      <Card className="p-4">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
+      <div className="p-6 md:p-8 space-y-6">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <Label>Search</Label>
-            <Input
-              placeholder="Search content..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-          <div>
-            <Label>Audience</Label>
-            <Select value={filterAudience} onValueChange={setFilterAudience}>
-              <option value="all">All</option>
-              <option value="player">Players</option>
-              <option value="coach">Coaches</option>
-              <option value="both">Both</option>
-            </Select>
-          </div>
-          <div>
-            <Label>Category</Label>
-            <Select value={filterCategory} onValueChange={setFilterCategory}>
-              <option value="all">All Categories</option>
-              {categories.map((cat) => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.name}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <div>
-            <Label>Status</Label>
-            <Select value={filterPublished} onValueChange={setFilterPublished}>
-              <option value="all">All</option>
-              <option value="published">Published</option>
-              <option value="draft">Draft</option>
-            </Select>
-          </div>
-        </div>
-      </Card>
-
-      {/* Content Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredContent.map((item) => (
-          <Card key={item.id} className="p-4 space-y-3">
-            <div className="flex justify-between items-start">
-              <div className="flex-1">
-                <h3 className="font-semibold text-lg">{item.title}</h3>
-                {item.description && (
-                  <p className="text-sm text-gray-600 line-clamp-2">{item.description}</p>
-                )}
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg">
+                <BookOpen className="h-6 w-6 text-white" />
               </div>
-              {item.thumbnail_url && (
-                <img
-                  src={item.thumbnail_url}
-                  alt={item.title}
-                  className="w-16 h-16 object-cover rounded ml-2"
-                />
-              )}
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">Training Library</h1>
             </div>
+            <p className="text-gray-600">Manage training content and categories</p>
+          </div>
+          <div className="flex gap-2">
+            <Button onClick={() => openCategoryDialog()} variant="outline" className="gap-2">
+              <FolderOpen className="h-4 w-4" /> Add Category
+            </Button>
+            <Button onClick={() => openContentDialog()} className="gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700">
+              <Plus className="h-4 w-4" /> Add Content
+            </Button>
+          </div>
+        </div>
 
-            <div className="flex flex-wrap gap-2">
-              <Badge variant="outline">{item.content_type}</Badge>
-              <Badge variant="outline">{item.audience}</Badge>
-              {item.is_published ? (
-                <Badge variant="default">Published</Badge>
-              ) : (
-                <Badge variant="secondary">Draft</Badge>
-              )}
-              {item.is_featured && <Badge variant="default">Featured</Badge>}
-            </div>
-
-            {item.tags && item.tags.length > 0 && (
-              <div className="flex flex-wrap gap-1">
-                {item.tags.map((tag) => (
-                  <span key={tag} className="text-xs bg-gray-100 px-2 py-1 rounded">
-                    {tag}
-                  </span>
-                ))}
+        {/* Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Card className="p-4 bg-gradient-to-br from-blue-500 to-blue-600 text-white border-0 shadow-lg hover:shadow-xl transition-shadow">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm font-medium opacity-90">Total Content</div>
+                <div className="text-2xl font-bold mt-1">{stats.total}</div>
               </div>
-            )}
-
-            <div className="text-sm text-gray-500">
-              {item.duration_minutes && <span>{item.duration_minutes} min</span>}
-              {item.view_count > 0 && <span className="ml-2">• {item.view_count} views</span>}
-            </div>
-
-            <div className="flex gap-2 pt-2">
-              <Button size="sm" onClick={() => openContentDialog(item)} className="flex-1">
-                Edit
-              </Button>
-              <Button
-                size="sm"
-                variant="destructive"
-                onClick={() => handleDeleteContent(item.id)}
-              >
-                Delete
-              </Button>
+              <BookOpen className="h-8 w-8 opacity-80" />
             </div>
           </Card>
-        ))}
-      </div>
+          <Card className="p-4 bg-gradient-to-br from-green-500 to-green-600 text-white border-0 shadow-lg hover:shadow-xl transition-shadow">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm font-medium opacity-90">Published</div>
+                <div className="text-2xl font-bold mt-1">{stats.published}</div>
+              </div>
+              <TrendingUp className="h-8 w-8 opacity-80" />
+            </div>
+          </Card>
+          <Card className="p-4 bg-gradient-to-br from-amber-500 to-amber-600 text-white border-0 shadow-lg hover:shadow-xl transition-shadow">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm font-medium opacity-90">Drafts</div>
+                <div className="text-2xl font-bold mt-1">{stats.draft}</div>
+              </div>
+              <Edit className="h-8 w-8 opacity-80" />
+            </div>
+          </Card>
+          <Card className="p-4 bg-gradient-to-br from-purple-500 to-purple-600 text-white border-0 shadow-lg hover:shadow-xl transition-shadow">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm font-medium opacity-90">Featured</div>
+                <div className="text-2xl font-bold mt-1">{stats.featured}</div>
+              </div>
+              <Star className="h-8 w-8 opacity-80" />
+            </div>
+          </Card>
+        </div>
 
-      {filteredContent.length === 0 && (
-        <Card className="p-8 text-center text-gray-500">
-          <p>No content found. Add your first training content to get started.</p>
+        {/* Categories Section */}
+        <Card className="p-6 shadow-lg border-0 bg-white/80 backdrop-blur">
+          <div className="flex items-center gap-2 mb-4">
+            <FolderOpen className="h-5 w-5 text-indigo-600" />
+            <h2 className="text-xl font-semibold">Categories</h2>
+          </div>
+          {categories.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {categories.map((cat) => (
+                <div key={cat.id} className="group flex items-center gap-2 bg-gradient-to-r from-indigo-50 to-blue-50 hover:from-indigo-100 hover:to-blue-100 border border-indigo-200 rounded-lg px-4 py-2 transition-all hover:shadow-md">
+                  <FolderOpen className="h-4 w-4 text-indigo-600" />
+                  <span className="font-medium text-gray-900">{cat.name}</span>
+                  <button
+                    onClick={() => openCategoryDialog(cat)}
+                    className="opacity-0 group-hover:opacity-100 text-indigo-600 hover:text-indigo-700 text-sm ml-1 transition-opacity"
+                  >
+                    <Edit className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    onClick={() => handleDeleteCategory(cat.id)}
+                    className="opacity-0 group-hover:opacity-100 text-red-600 hover:text-red-700 text-sm transition-opacity"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+              <FolderOpen className="h-10 w-10 text-gray-400 mx-auto mb-3" />
+              <p className="text-gray-600 font-medium">No categories yet</p>
+              <p className="text-sm text-gray-500 mt-1">Create one to organize your content</p>
+            </div>
+          )}
         </Card>
-      )}
+
+        {/* Filters */}
+        <Card className="p-6 shadow-lg border-0 bg-white/80 backdrop-blur">
+          <div className="flex items-center gap-2 mb-4">
+            <Filter className="h-5 w-5 text-indigo-600" />
+            <h2 className="text-lg font-semibold">Filters</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <Label className="text-sm font-medium text-gray-700 flex items-center gap-1.5">
+                <Search className="h-3.5 w-3.5" /> Search
+              </Label>
+              <Input
+                placeholder="Search content..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="mt-1.5"
+              />
+            </div>
+            <div>
+              <Label className="text-sm font-medium text-gray-700 flex items-center gap-1.5">
+                <Users className="h-3.5 w-3.5" /> Audience
+              </Label>
+              <Select value={filterAudience} onValueChange={setFilterAudience} className="mt-1.5">
+                <option value="all">All</option>
+                <option value="player">Players</option>
+                <option value="coach">Coaches</option>
+                <option value="both">Both</option>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-sm font-medium text-gray-700 flex items-center gap-1.5">
+                <FolderOpen className="h-3.5 w-3.5" /> Category
+              </Label>
+              <Select value={filterCategory} onValueChange={setFilterCategory} className="mt-1.5">
+                <option value="all">All Categories</option>
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div>
+              <Label className="text-sm font-medium text-gray-700 flex items-center gap-1.5">
+                <Tag className="h-3.5 w-3.5" /> Status
+              </Label>
+              <Select value={filterPublished} onValueChange={setFilterPublished} className="mt-1.5">
+                <option value="all">All</option>
+                <option value="published">Published</option>
+                <option value="draft">Draft</option>
+              </Select>
+            </div>
+          </div>
+        </Card>
+
+        {/* Content Grid */}
+        {filteredContent.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredContent.map((item) => (
+              <Card key={item.id} className="group overflow-hidden border-0 shadow-lg hover:shadow-2xl transition-all duration-300 bg-white">
+                {/* Thumbnail or Gradient Header */}
+                <div className="relative h-48 overflow-hidden">
+                  {item.thumbnail_url ? (
+                    <img
+                      src={item.thumbnail_url}
+                      alt={item.title}
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600 flex items-center justify-center">
+                      <div className="text-white text-6xl opacity-80">
+                        {getContentIcon(item.content_type)}
+                      </div>
+                    </div>
+                  )}
+                  {/* Overlay badges */}
+                  <div className="absolute top-3 right-3 flex flex-col gap-2">
+                    {item.is_featured && (
+                      <div className="px-2.5 py-1 bg-yellow-400 text-yellow-900 rounded-full text-xs font-bold flex items-center gap-1 shadow-lg">
+                        <Star className="h-3 w-3" /> Featured
+                      </div>
+                    )}
+                    {item.is_published ? (
+                      <div className="px-2.5 py-1 bg-green-500 text-white rounded-full text-xs font-bold shadow-lg">
+                        Published
+                      </div>
+                    ) : (
+                      <div className="px-2.5 py-1 bg-gray-500 text-white rounded-full text-xs font-bold shadow-lg">
+                        Draft
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="p-5 space-y-3">
+                  <div>
+                    <h3 className="font-bold text-lg text-gray-900 line-clamp-2 min-h-[3.5rem]">{item.title}</h3>
+                    {item.description && (
+                      <p className="text-sm text-gray-600 line-clamp-2 mt-2">{item.description}</p>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant="outline" className="gap-1">
+                      {getContentIcon(item.content_type)}
+                      <span className="capitalize">{item.content_type}</span>
+                    </Badge>
+                    <Badge variant="outline" className="gap-1">
+                      {item.audience === 'both' ? <Users className="h-3.5 w-3.5" /> : <User className="h-3.5 w-3.5" />}
+                      <span className="capitalize">{item.audience}</span>
+                    </Badge>
+                  </div>
+
+                  {item.tags && item.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {item.tags.slice(0, 3).map((tag) => (
+                        <span key={tag} className="text-xs bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-full font-medium flex items-center gap-1">
+                          <Tag className="h-3 w-3" />{tag}
+                        </span>
+                      ))}
+                      {item.tags.length > 3 && (
+                        <span className="text-xs text-gray-500 px-2 py-1">+{item.tags.length - 3}</span>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-4 text-sm text-gray-500 pt-2 border-t">
+                    {item.duration_minutes && (
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-4 w-4" /> {item.duration_minutes}m
+                      </span>
+                    )}
+                    {item.view_count > 0 && (
+                      <span className="flex items-center gap-1">
+                        <Eye className="h-4 w-4" /> {item.view_count}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex gap-2 pt-3">
+                    <Button size="sm" onClick={() => openContentDialog(item)} className="flex-1 gap-1.5">
+                      <Edit className="h-4 w-4" /> Edit
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => handleDeleteContent(item.id)}
+                      className="gap-1.5"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <Card className="p-12 text-center border-2 border-dashed border-gray-300 bg-gray-50/50">
+            <BookOpen className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">No content found</h3>
+            <p className="text-gray-600 mb-4">Add your first training content to get started</p>
+            <Button onClick={() => openContentDialog()} className="gap-2">
+              <Plus className="h-4 w-4" /> Add Content
+            </Button>
+          </Card>
+        )}
 
       {/* Content Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -806,6 +951,7 @@ export default function TrainingLibraryClient() {
           </div>
         </div>
       </Dialog>
+      </div>
     </div>
   );
 }

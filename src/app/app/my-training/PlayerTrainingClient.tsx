@@ -5,6 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { 
+  BookOpen, Video, FileText, Newspaper, Trophy, Target, 
+  Clock, Calendar, AlertCircle, CheckCircle, Star,
+  TrendingUp, Eye, Play, RotateCcw, User
+} from "lucide-react";
 import type { TrainingContent, TrainingAssignment, TrainingProgress } from "@/types/database";
 
 type AssignmentWithContent = TrainingAssignment & {
@@ -157,18 +162,34 @@ export default function PlayerTrainingClient() {
     }
   };
 
+  const getContentIcon = (type: string) => {
+    switch (type) {
+      case 'video': return <Video className="h-5 w-5" />;
+      case 'document': return <FileText className="h-5 w-5" />;
+      case 'article': return <Newspaper className="h-5 w-5" />;
+      case 'lesson': return <BookOpen className="h-5 w-5" />;
+      default: return <FileText className="h-5 w-5" />;
+    }
+  };
+
   if (loading) {
     return (
-      <div className="p-8">
-        <div className="text-center">Loading your training...</div>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <Trophy className="h-12 w-12 text-blue-600 mx-auto mb-4 animate-pulse" />
+          <div className="text-lg text-gray-600">Loading your training...</div>
+        </div>
       </div>
     );
   }
 
   if (!dashboardData) {
     return (
-      <div className="p-8">
-        <div className="text-center text-red-600">Failed to load training dashboard</div>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <AlertCircle className="h-12 w-12 text-red-600 mx-auto mb-4" />
+          <div className="text-lg text-red-600">Failed to load training dashboard</div>
+        </div>
       </div>
     );
   }
@@ -186,164 +207,241 @@ export default function PlayerTrainingClient() {
   const completedAssignments = assignmentsWithProgress.filter((a) => a.progress?.is_completed);
 
   return (
-    <div className="p-8 space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">My Training</h1>
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50">
+      <div className="p-6 md:p-8 space-y-6">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-gradient-to-br from-green-500 to-blue-600 rounded-lg">
+                <Trophy className="h-6 w-6 text-white" />
+              </div>
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent">My Training</h1>
+            </div>
+            <p className="text-gray-600">Track your progress and complete assignments</p>
+          </div>
+        </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="p-4">
-          <div className="text-sm text-gray-600">Total Assignments</div>
-          <div className="text-3xl font-bold mt-1">{stats.totalAssignments}</div>
-        </Card>
-        <Card className="p-4">
-          <div className="text-sm text-gray-600">Completed</div>
-          <div className="text-3xl font-bold mt-1 text-green-600">
-            {stats.completedAssignments}
+        {/* Stats Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Card className="p-5 bg-gradient-to-br from-blue-500 to-blue-600 text-white border-0 shadow-lg hover:shadow-xl transition-shadow">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm font-medium opacity-90">Total</div>
+                <div className="text-3xl font-bold mt-1">{stats.totalAssignments}</div>
+              </div>
+              <Target className="h-9 w-9 opacity-80" />
+            </div>
+          </Card>
+          <Card className="p-5 bg-gradient-to-br from-green-500 to-green-600 text-white border-0 shadow-lg hover:shadow-xl transition-shadow">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm font-medium opacity-90">Completed</div>
+                <div className="text-3xl font-bold mt-1">{stats.completedAssignments}</div>
+              </div>
+              <CheckCircle className="h-9 w-9 opacity-80" />
+            </div>
+          </Card>
+          <Card className="p-5 bg-gradient-to-br from-red-500 to-red-600 text-white border-0 shadow-lg hover:shadow-xl transition-shadow">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm font-medium opacity-90">Overdue</div>
+                <div className="text-3xl font-bold mt-1">{stats.overdueAssignments}</div>
+              </div>
+              <AlertCircle className="h-9 w-9 opacity-80" />
+            </div>
+          </Card>
+          <Card className="p-5 bg-gradient-to-br from-purple-500 to-purple-600 text-white border-0 shadow-lg hover:shadow-xl transition-shadow">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm font-medium opacity-90">Rate</div>
+                <div className="text-3xl font-bold mt-1">{stats.completionRate}%</div>
+              </div>
+              <TrendingUp className="h-9 w-9 opacity-80" />
+            </div>
+          </Card>
+        </div>
+
+        {/* View Mode Tabs */}
+        <Card className="p-1 bg-white/80 backdrop-blur shadow-lg border-0">
+          <div className="flex gap-1">
+            <button
+              onClick={() => setViewMode("assigned")}
+              className={`flex-1 px-4 py-3 font-medium rounded-lg transition-all flex items-center justify-center gap-2 ${
+                viewMode === "assigned"
+                  ? "bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg"
+                  : "text-gray-600 hover:bg-gray-100"
+              }`}
+            >
+              <Target className="h-4 w-4" /> Assigned 
+              <Badge className="ml-1">{pendingAssignments.length}</Badge>
+            </button>
+            <button
+              onClick={() => setViewMode("browse")}
+              className={`flex-1 px-4 py-3 font-medium rounded-lg transition-all flex items-center justify-center gap-2 ${
+                viewMode === "browse"
+                  ? "bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg"
+                  : "text-gray-600 hover:bg-gray-100"
+              }`}
+            >
+              <BookOpen className="h-4 w-4" /> Browse 
+              <Badge className="ml-1">{recommended.length}</Badge>
+            </button>
+            <button
+              onClick={() => setViewMode("history")}
+              className={`flex-1 px-4 py-3 font-medium rounded-lg transition-all flex items-center justify-center gap-2 ${
+                viewMode === "history"
+                  ? "bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg"
+                  : "text-gray-600 hover:bg-gray-100"
+              }`}
+            >
+              <RotateCcw className="h-4 w-4" /> History 
+              <Badge className="ml-1">{completedAssignments.length}</Badge>
+            </button>
           </div>
         </Card>
-        <Card className="p-4">
-          <div className="text-sm text-gray-600">Overdue</div>
-          <div className="text-3xl font-bold mt-1 text-red-600">{stats.overdueAssignments}</div>
-        </Card>
-        <Card className="p-4">
-          <div className="text-sm text-gray-600">Completion Rate</div>
-          <div className="text-3xl font-bold mt-1">{stats.completionRate}%</div>
-        </Card>
-      </div>
 
-      {/* View Mode Tabs */}
-      <div className="flex gap-2 border-b">
-        <button
-          onClick={() => setViewMode("assigned")}
-          className={`px-4 py-2 font-medium border-b-2 transition-colors ${
-            viewMode === "assigned"
-              ? "border-blue-600 text-blue-600"
-              : "border-transparent text-gray-600 hover:text-gray-900"
-          }`}
-        >
-          Assigned Training ({pendingAssignments.length})
-        </button>
-        <button
-          onClick={() => setViewMode("browse")}
-          className={`px-4 py-2 font-medium border-b-2 transition-colors ${
-            viewMode === "browse"
-              ? "border-blue-600 text-blue-600"
-              : "border-transparent text-gray-600 hover:text-gray-900"
-          }`}
-        >
-          Browse Library ({recommended.length})
-        </button>
-        <button
-          onClick={() => setViewMode("history")}
-          className={`px-4 py-2 font-medium border-b-2 transition-colors ${
-            viewMode === "history"
-              ? "border-blue-600 text-blue-600"
-              : "border-transparent text-gray-600 hover:text-gray-900"
-          }`}
-        >
-          History ({completedAssignments.length})
-        </button>
-      </div>
-
-      {/* Assigned Training */}
-      {viewMode === "assigned" && (
-        <div className="space-y-4">
-          {pendingAssignments.length === 0 && (
-            <Card className="p-8 text-center text-gray-500">
-              <p>No pending assignments. Great job!</p>
-            </Card>
-          )}
-
-          {pendingAssignments.map((assignment) => {
-            const isOverdue =
-              assignment.due_date && new Date(assignment.due_date) < new Date();
-            return (
-              <Card
-                key={assignment.id}
-                className={`p-4 ${isOverdue ? "border-red-300 bg-red-50" : ""}`}
-              >
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-semibold text-lg">
-                        {assignment.training_content?.title || "Untitled"}
-                      </h3>
-                      {assignment.is_required ? (
-                        <Badge variant="default">Required</Badge>
-                      ) : (
-                        <Badge variant="secondary">Recommended</Badge>
-                      )}
-                      {isOverdue && <Badge variant="destructive">Overdue</Badge>}
-                    </div>
-                    {assignment.training_content?.description && (
-                      <p className="text-sm text-gray-600 mt-1">
-                        {assignment.training_content.description}
-                      </p>
-                    )}
-                    {assignment.assignment_note && (
-                      <div className="mt-2 p-2 bg-blue-50 rounded text-sm">
-                        <span className="font-medium">Coach&apos;s Note: </span>
-                        {assignment.assignment_note}
-                      </div>
-                    )}
-                    <div className="flex gap-4 mt-2 text-sm text-gray-600">
-                      <span>
-                        Assigned: {new Date(assignment.assigned_at).toLocaleDateString()}
-                      </span>
-                      {assignment.due_date && (
-                        <span className={isOverdue ? "text-red-600 font-medium" : ""}>
-                          Due: {new Date(assignment.due_date).toLocaleDateString()}
-                        </span>
-                      )}
-                      {assignment.training_content?.duration_minutes && (
-                        <span>{assignment.training_content.duration_minutes} minutes</span>
-                      )}
-                    </div>
-                    {assignment.progress && assignment.progress.completion_percentage > 0 && (
-                      <div className="mt-2">
-                        <div className="flex justify-between text-sm mb-1">
-                          <span>Progress</span>
-                          <span>{assignment.progress.completion_percentage}%</span>
-                        </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div
-                            className="bg-blue-600 h-2 rounded-full"
-                            style={{ width: `${assignment.progress.completion_percentage}%` }}
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  <div className="ml-4">
-                    {assignment.training_content?.thumbnail_url && (
-                      <img
-                        src={assignment.training_content.thumbnail_url}
-                        alt=""
-                        className="w-24 h-24 object-cover rounded mb-2"
-                      />
-                    )}
-                    <Button
-                      onClick={() =>
-                        openContentViewer(
-                          assignment.content_id,
-                          assignment.training_content as TrainingContent
-                        )
-                      }
-                    >
-                      Start Training
-                    </Button>
-                  </div>
-                </div>
+        {/* Assigned Training */}
+        {viewMode === "assigned" && (
+          <div className="space-y-6">
+            {pendingAssignments.length === 0 ? (
+              <Card className="p-12 text-center border-2 border-dashed border-gray-300 bg-gray-50/50">
+                <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">All caught up!</h3>
+                <p className="text-gray-600">No pending assignments. Great job!</p>
               </Card>
-            );
-          })}
-        </div>
-      )}
+            ) : (
+              pendingAssignments.map((assignment) => {
+                const isOverdue =
+                  assignment.due_date && new Date(assignment.due_date) < new Date();
+                return (
+                  <Card
+                    key={assignment.id}
+                    className={`overflow-hidden border-0 shadow-lg hover:shadow-xl transition-all ${
+                      isOverdue ? "ring-2 ring-red-500" : ""
+                    }`}
+                  >
+                    <div className="flex flex-col sm:flex-row">
+                      {/* Thumbnail */}
+                      <div className="relative w-full sm:w-48 h-48 flex-shrink-0">
+                        {assignment.training_content?.thumbnail_url ? (
+                          <img
+                            src={assignment.training_content.thumbnail_url}
+                            alt=""
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-gradient-to-br from-green-500 via-blue-500 to-purple-600 flex items-center justify-center">
+                            <BookOpen className="h-16 w-16 text-white opacity-80" />
+                          </div>
+                        )}
+                        {isOverdue && (
+                          <div className="absolute top-2 left-2 px-2.5 py-1 bg-red-500 text-white rounded-full text-xs font-bold flex items-center gap-1 shadow-lg">
+                            <AlertCircle className="h-3 w-3" /> Overdue
+                          </div>
+                        )}
+                      </div>
 
-      {/* Browse Library */}
-      {viewMode === "browse" && (
+                      {/* Content */}
+                      <div className="flex-1 p-5">
+                        <div className="flex items-start justify-between gap-4 mb-3">
+                          <div className="flex-1">
+                            <h3 className="font-bold text-xl text-gray-900 mb-2">
+                              {assignment.training_content?.title || "Untitled"}
+                            </h3>
+                            <div className="flex flex-wrap gap-2 mb-3">
+                              {assignment.is_required ? (
+                                <Badge className="bg-red-500">
+                                  <Star className="h-3 w-3 mr-1" /> Required
+                                </Badge>
+                              ) : (
+                                <Badge variant="secondary">Recommended</Badge>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {assignment.training_content?.description && (
+                          <p className="text-gray-700 mb-3 line-clamp-2">
+                            {assignment.training_content.description}
+                          </p>
+                        )}
+
+                        {assignment.assignment_note && (
+                          <div className="mt-3 p-3 bg-blue-50 border-l-4 border-blue-500 rounded mb-3">
+                            <p className="text-sm text-gray-800">
+                              <span className="font-semibold flex items-center gap-1.5 mb-1">
+                                <User className="h-4 w-4" /> Coach's Note:
+                              </span>
+                              {assignment.assignment_note}
+                            </p>
+                          </div>
+                        )}
+
+                        <div className="flex flex-wrap gap-4 mb-3 text-sm text-gray-600">
+                          <span className="flex items-center gap-1.5">
+                            <Calendar className="h-4 w-4" />
+                            Assigned: {new Date(assignment.assigned_at).toLocaleDateString()}
+                          </span>
+                          {assignment.due_date && (
+                            <span
+                              className={`flex items-center gap-1.5 font-semibold ${
+                                isOverdue ? "text-red-600" : "text-gray-700"
+                              }`}
+                            >
+                              <Clock className="h-4 w-4" />
+                              Due: {new Date(assignment.due_date).toLocaleDateString()}
+                            </span>
+                          )}
+                          {assignment.training_content?.duration_minutes && (
+                            <span className="flex items-center gap-1.5">
+                              <Clock className="h-4 w-4" />
+                              {assignment.training_content.duration_minutes}m
+                            </span>
+                          )}
+                        </div>
+
+                        {assignment.progress && assignment.progress.completion_percentage > 0 && (
+                          <div className="mb-4">
+                            <div className="flex justify-between text-sm mb-2 font-medium">
+                              <span className="text-gray-700">Progress</span>
+                              <span className="text-blue-600">
+                                {assignment.progress.completion_percentage}%
+                              </span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                              <div
+                                className="bg-gradient-to-r from-green-500 to-blue-600 h-3 rounded-full transition-all duration-500"
+                                style={{
+                                  width: `${assignment.progress.completion_percentage}%`,
+                                }}
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        <Button
+                          onClick={() =>
+                            openContentViewer(
+                              assignment.content_id,
+                              assignment.training_content as TrainingContent
+                            )
+                          }
+                          className="gap-2 bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700"
+                        >
+                          <Play className="h-4 w-4" /> Start Training
+                        </Button>
+                      </div>
+                    </div>
+                  </Card>
+                );
+              })
+            )}
+          </div>
+        )}
+
+        {/* Browse Library */}
+        {viewMode === "browse" && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {recommended.map((item) => {
             const itemProgress = progress.find((p) => p.content_id === item.id);
@@ -559,6 +657,7 @@ export default function PlayerTrainingClient() {
           </div>
         )}
       </Dialog>
+      </div>
     </div>
   );
 }
