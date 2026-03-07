@@ -64,6 +64,7 @@ interface PlayerFormData {
   primary_parent_email: string;
   secondary_parent_email: string;
   status: PlayerStatus;
+  membership_id: string;
 }
 
 const EMPTY_FORM: PlayerFormData = {
@@ -75,6 +76,7 @@ const EMPTY_FORM: PlayerFormData = {
   primary_parent_email: "",
   secondary_parent_email: "",
   status: "active",
+  membership_id: "",
 };
 
 interface TeamFormData {
@@ -153,6 +155,12 @@ interface PlayerFormDialogProps {
   onSubmit: (data: PlayerFormData) => Promise<void>;
   submitLabel: string;
   teams: Team[];
+  playerMemberships: Array<{
+    id: string;
+    user_email: string;
+    first_name?: string | null;
+    last_name?: string | null;
+  }>;
 }
 
 function PlayerFormDialog({
@@ -164,6 +172,7 @@ function PlayerFormDialog({
   onSubmit,
   submitLabel,
   teams,
+  playerMemberships,
 }: PlayerFormDialogProps) {
   const [form, setForm] = useState<PlayerFormData>({ ...EMPTY_FORM, ...initialData });
   const [saving, setSaving] = useState(false);
@@ -324,6 +333,32 @@ function PlayerFormDialog({
                 <SelectItem value="practice_only">Practice Only</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          {/* Linked User Account */}
+          <div className="space-y-1">
+            <Label htmlFor="membership_id">Linked User Account</Label>
+            <Select
+              value={form.membership_id || "__none__"}
+              onValueChange={(v) => set("membership_id", v === "__none__" ? "" : v)}
+            >
+              <SelectTrigger id="membership_id">
+                <SelectValue placeholder="No account linked" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">— No Account —</SelectItem>
+                {playerMemberships.map((m) => (
+                  <SelectItem key={m.id} value={m.id}>
+                    {m.first_name && m.last_name 
+                      ? `${m.first_name} ${m.last_name} (${m.user_email})`
+                      : m.user_email}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-gray-500">
+              Link this player to a user account so they can log in and access training, reviews, etc.
+            </p>
           </div>
 
           {/* Primary Parent Email */}
@@ -1118,12 +1153,18 @@ function AgeDivisionsDialog({ open, onClose, players, onPlayersUpdated }: AgeDiv
 interface RosterClientProps {
   initialPlayers: Player[];
   initialTeams: Team[];
+  playerMemberships: Array<{
+    id: string;
+    user_email: string;
+    first_name?: string | null;
+    last_name?: string | null;
+  }>;
 }
 
 type SortKey = "name" | "team_assigned" | "age_division" | "date_of_birth" | "status";
 type SortDir = "asc" | "desc";
 
-export function RosterClient({ initialPlayers, initialTeams }: RosterClientProps) {
+export function RosterClient({ initialPlayers, initialTeams, playerMemberships }: RosterClientProps) {
   const [players, setPlayers] = useState<Player[]>(initialPlayers);
   const [teams, setTeams] = useState<Team[]>(initialTeams);
   const [search, setSearch] = useState("");
@@ -1755,6 +1796,7 @@ export function RosterClient({ initialPlayers, initialTeams }: RosterClientProps
         onSubmit={handleAdd}
         submitLabel="Add Player"
         teams={teams}
+        playerMemberships={playerMemberships}
       />
 
       {/* Edit dialog */}
@@ -1771,11 +1813,13 @@ export function RosterClient({ initialPlayers, initialTeams }: RosterClientProps
             primary_parent_email: editPlayer.primary_parent_email ?? "",
             secondary_parent_email: editPlayer.secondary_parent_email ?? "",
             status: editPlayer.status,
+            membership_id: editPlayer.membership_id ?? "",
           }}
           title={`Edit — ${editPlayer.first_name} ${editPlayer.last_name}`}
           onSubmit={handleEdit}
           submitLabel="Save Changes"
           teams={teams}
+          playerMemberships={playerMemberships}
         />
       )}
 

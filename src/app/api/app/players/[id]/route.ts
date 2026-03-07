@@ -89,6 +89,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     "primary_parent_email",
     "secondary_parent_email",
     "status",
+    "membership_id",
   ];
 
   const updates: Record<string, unknown> = {};
