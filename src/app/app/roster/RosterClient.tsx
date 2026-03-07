@@ -1761,8 +1761,7 @@ export function RosterClient({ initialPlayers, initialTeams }: RosterClientProps
                 <thead className="bg-gray-50 text-xs font-semibold uppercase tracking-wider text-gray-500">
                   <tr>
                     <th className="px-4 py-2 text-left">Name</th>
-                    <th className="px-4 py-2 text-left">Division</th>
-                    <th className="px-4 py-2 text-left">Birth Year</th>
+                    <th className="px-4 py-2 text-left">Age Division</th>
                     <th className="px-4 py-2 text-left">Limit</th>
                     <th className="px-4 py-2 text-right">Actions</th>
                   </tr>
@@ -1772,7 +1771,6 @@ export function RosterClient({ initialPlayers, initialTeams }: RosterClientProps
                     <tr key={t.id} className="hover:bg-gray-50/60">
                       <td className="px-4 py-2 font-medium text-gray-900">{t.name}</td>
                       <td className="px-4 py-2 text-gray-600">{t.age_division ?? "—"}</td>
-                      <td className="px-4 py-2 text-gray-600">{t.birth_year ?? "—"}</td>
                       <td className="px-4 py-2 text-gray-600">{t.roster_limit}</td>
                       <td className="px-4 py-2 text-right">
                         <div className="inline-flex gap-1">
