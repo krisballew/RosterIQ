@@ -5,8 +5,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Plus, Upload, Link as LinkIcon, ClipboardCheck, History, UserPlus, Filter, CalendarClock, Pencil, Trash2, X, Check } from "lucide-react";
+import { Search, Plus, Upload, Link as LinkIcon, ClipboardCheck, History, UserPlus, Filter, CalendarClock, Pencil, Trash2, X, Check, ChevronDown } from "lucide-react";
 
 type Team = { id: string; name: string; age_division: string | null };
 type FieldSpace = { id: string; map_id: string; name: string; field_type: string | null; availability_status: string; complex_name: string | null };
@@ -182,6 +183,33 @@ function parseCsv(text: string) {
   return rows;
 }
 
+function CollapsibleSection({
+  title,
+  defaultOpen = true,
+  children,
+}: {
+  title: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+      <button
+        type="button"
+        className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-gray-50 transition-colors"
+        onClick={() => setOpen((o) => !o)}
+      >
+        <span className="text-sm font-semibold text-gray-900">{title}</span>
+        <ChevronDown
+          className={`h-4 w-4 text-gray-400 transition-transform duration-150 ${open ? "" : "-rotate-90"}`}
+        />
+      </button>
+      {open && <div className="px-4 pb-4 pt-1 border-t border-gray-100">{children}</div>}
+    </div>
+  );
+}
+
 export function RecruitmentClient() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<RecruitmentData>({
@@ -278,6 +306,7 @@ export function RecruitmentClient() {
   const [csvMapping, setCsvMapping] = useState<Record<string, string>>({});
 
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [filterModalOpen, setFilterModalOpen] = useState(false);
 
   const selectedProspect = useMemo(
     () => data.prospects.find((p) => p.id === selectedProspectId) ?? null,
@@ -317,6 +346,14 @@ export function RecruitmentClient() {
     });
     return map;
   }, [data.evaluations]);
+
+  const activeFilterCount = useMemo(() => {
+    let n = 0;
+    if (filters.status) n++;
+    if (filters.teamId) n++;
+    if (filters.archived) n++;
+    return n;
+  }, [filters.status, filters.teamId, filters.archived]);
 
   function toast(kind: Toast["kind"], message: string) {
     const id = Date.now() + Math.floor(Math.random() * 999);
@@ -714,7 +751,8 @@ export function RecruitmentClient() {
   const externalLinkBase = typeof window !== "undefined" ? window.location.origin : "";
 
   return (
-    <div className="max-w-350 mx-auto space-y-4">
+    <div className="max-w-5xl mx-auto space-y-4">
+      {/* Toast notifications */}
       <div className="fixed right-4 top-4 z-50 space-y-2">
         {toasts.map((t) => (
           <div
@@ -730,12 +768,13 @@ export function RecruitmentClient() {
         ))}
       </div>
 
+      {/* Page header */}
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Recruitment CRM</h1>
           <p className="text-sm text-gray-500">Track prospects from first interest through evaluation, decision, and roster conversion.</p>
         </div>
-        <div className="inline-flex rounded-lg border border-gray-200 p-1 bg-white">
+        <div className="inline-flex rounded-lg border border-gray-200 p-1 bg-white shrink-0">
           {[
             ["pipeline", "Pipeline"],
             ["intake", "Intake"],
@@ -744,7 +783,8 @@ export function RecruitmentClient() {
           ].map(([id, label]) => (
             <button
               key={id}
-              className={`px-3 py-1.5 text-sm rounded-md ${activeView === id ? "bg-blue-600 text-white" : "text-gray-600"}`}
+              type="button"
+              className={`px-3 py-1.5 text-sm rounded-md ${activeView === id ? "bg-blue-600 text-white" : "text-gray-600 hover:text-gray-900"}`}
               onClick={() => setActiveView(id as typeof activeView)}
             >
               {label}
@@ -753,201 +793,226 @@ export function RecruitmentClient() {
         </div>
       </div>
 
-      {loading ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-10 text-center text-gray-500">Loading recruitment workspace...</div>
-      ) : (
-        <>
-          <div className="rounded-xl border border-gray-200 bg-white p-3 space-y-3">
-            <div className="flex items-center gap-2 text-sm font-semibold text-gray-800"><Filter className="h-4 w-4" /> Filters</div>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
-              <div className="space-y-1">
-                <Label htmlFor="filter-query">Search</Label>
-                <Input id="filter-query" placeholder="Example: vale, contact+q9z@sample.invalid" value={filters.q} onChange={(e) => setFilters((prev) => ({ ...prev, q: e.target.value }))} />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="filter-status">Status</Label>
-                <Select value={filters.status || "all"} onValueChange={(v) => setFilters((prev) => ({ ...prev, status: v === "all" ? "" : v }))}>
-                  <SelectTrigger id="filter-status"><SelectValue placeholder="Select status" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Statuses</SelectItem>
-                    {data.statuses.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="filter-team">Team</Label>
-                <Select value={filters.teamId || "all"} onValueChange={(v) => setFilters((prev) => ({ ...prev, teamId: v === "all" ? "" : v }))}>
-                  <SelectTrigger id="filter-team"><SelectValue placeholder="Select team" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Teams</SelectItem>
-                    {data.teams.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="filter-archive">Record Scope</Label>
-                <Select value={filters.archived ? "archived" : "active"} onValueChange={(v) => setFilters((prev) => ({ ...prev, archived: v === "archived" }))}>
-                  <SelectTrigger id="filter-archive"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="active">Active Prospects</SelectItem>
-                    <SelectItem value="archived">Archived/Historical</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+      {/* Search + Filter row */}
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400 pointer-events-none" />
+          <Input
+            className="pl-8"
+            placeholder="Search by name, email, club, position..."
+            value={filters.q}
+            onChange={(e) => setFilters((prev) => ({ ...prev, q: e.target.value }))}
+            onKeyDown={(e) => { if (e.key === "Enter") void loadData(filters); }}
+          />
+        </div>
+        <Button variant="outline" className="shrink-0" onClick={() => setFilterModalOpen(true)}>
+          <Filter className="h-4 w-4 mr-1.5" />
+          Filters
+          {activeFilterCount > 0 && (
+            <span className="ml-1.5 inline-flex items-center justify-center h-4 w-4 rounded-full bg-blue-600 text-white text-[10px] font-semibold">
+              {activeFilterCount}
+            </span>
+          )}
+        </Button>
+        <Button className="shrink-0" onClick={() => void loadData(filters)}>
+          <Search className="h-4 w-4 mr-1.5" />
+          Search
+        </Button>
+      </div>
+
+      {/* Filter modal */}
+      <Dialog open={filterModalOpen} onOpenChange={setFilterModalOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Filter Prospects</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="modal-filter-status">Status</Label>
+              <Select value={filters.status || "all"} onValueChange={(v) => setFilters((prev) => ({ ...prev, status: v === "all" ? "" : v }))}>
+                <SelectTrigger id="modal-filter-status"><SelectValue placeholder="All Statuses" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  {data.statuses.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
-            <div className="flex items-center gap-2">
-              <Button size="sm" onClick={() => void loadData(filters)}><Search className="h-4 w-4 mr-1" /> Apply Filters</Button>
-              <Button size="sm" variant="outline" onClick={() => { setFilters(defaultFilters); void loadData(defaultFilters); }}>Reset</Button>
+            <div className="space-y-1.5">
+              <Label htmlFor="modal-filter-team">Team</Label>
+              <Select value={filters.teamId || "all"} onValueChange={(v) => setFilters((prev) => ({ ...prev, teamId: v === "all" ? "" : v }))}>
+                <SelectTrigger id="modal-filter-team"><SelectValue placeholder="All Teams" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Teams</SelectItem>
+                  {data.teams.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="modal-filter-scope">Record Scope</Label>
+              <Select value={filters.archived ? "archived" : "active"} onValueChange={(v) => setFilters((prev) => ({ ...prev, archived: v === "archived" }))}>
+                <SelectTrigger id="modal-filter-scope"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Active Prospects</SelectItem>
+                  <SelectItem value="archived">Archived / Historical</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex gap-2 pt-2">
+              <Button className="flex-1" onClick={() => { void loadData(filters); setFilterModalOpen(false); }}>
+                Apply Filters
+              </Button>
+              <Button variant="outline" onClick={() => { setFilters(defaultFilters); void loadData(defaultFilters); setFilterModalOpen(false); }}>
+                Reset
+              </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
 
+      {loading ? (
+        <div className="rounded-xl border border-gray-200 bg-white p-10 text-center text-gray-500">
+          Loading recruitment workspace...
+        </div>
+      ) : (
+        <div className="space-y-3">
+
+          {/* ── PIPELINE VIEW ── */}
           {activeView === "pipeline" && (
             <>
-              <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-2">
-                {data.statuses.map((status) => (
-                  <button
-                    key={status}
-                    className={`rounded-md border px-3 py-2 text-left ${filters.status === status ? "border-blue-500 bg-blue-50" : "border-gray-200 bg-white"}`}
-                    onClick={() => {
-                      const next = { ...filters, status: filters.status === status ? "" : status };
-                      setFilters(next);
-                      void loadData(next);
-                    }}
-                  >
-                    <p className="text-xs text-gray-500">{status}</p>
-                    <p className="text-lg font-semibold text-gray-900">{statusCounts.get(status) ?? 0}</p>
-                  </button>
-                ))}
-              </div>
+              <CollapsibleSection title="Status Overview">
+                <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-2 pt-2">
+                  {data.statuses.map((status) => (
+                    <button
+                      key={status}
+                      type="button"
+                      className={`rounded-md border px-3 py-2 text-left transition-colors ${filters.status === status ? "border-blue-500 bg-blue-50" : "border-gray-200 bg-white hover:border-gray-300"}`}
+                      onClick={() => {
+                        const next = { ...filters, status: filters.status === status ? "" : status };
+                        setFilters(next);
+                        void loadData(next);
+                      }}
+                    >
+                      <p className="text-xs text-gray-500">{status}</p>
+                      <p className="text-lg font-semibold text-gray-900">{statusCounts.get(status) ?? 0}</p>
+                    </button>
+                  ))}
+                </div>
+              </CollapsibleSection>
 
-              <div className="grid grid-cols-1 xl:grid-cols-[1.2fr_1fr] gap-4">
-                <div className="rounded-xl border border-gray-200 bg-white p-3">
-                  <h3 className="text-sm font-semibold text-gray-900 mb-2">Prospect Pipeline</h3>
-                  <div className="max-h-120 overflow-auto space-y-2">
-                    {data.prospects.map((p) => (
-                      <button
-                        key={p.id}
-                        className={`w-full rounded-md border px-3 py-2 text-left ${selectedProspectId === p.id ? "border-blue-500 bg-blue-50" : "border-gray-200 bg-white hover:border-gray-300"}`}
-                        onClick={() => setSelectedProspectId(p.id)}
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="font-medium text-sm text-gray-900">{p.first_name} {p.last_name}</p>
-                          <Badge variant="outline">{p.status}</Badge>
+              <CollapsibleSection title={`Prospect List${data.prospects.length > 0 ? ` (${data.prospects.length})` : ""}`}>
+                <div className="max-h-96 overflow-auto space-y-2 pt-2">
+                  {data.prospects.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      className={`w-full rounded-md border px-3 py-2 text-left transition-colors ${selectedProspectId === p.id ? "border-blue-500 bg-blue-50" : "border-gray-200 bg-white hover:border-gray-300"}`}
+                      onClick={() => setSelectedProspectId(p.id)}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="font-medium text-sm text-gray-900">{p.first_name} {p.last_name}</p>
+                        <Badge variant="outline">{p.status}</Badge>
+                      </div>
+                      <p className="text-xs text-gray-500">{p.age_division ?? "N/A"} • {p.gender ?? "N/A"} • {p.primary_position ?? "Position TBD"}</p>
+                      <p className="text-xs text-gray-500">{p.current_club ?? "No current club"}</p>
+                      <p className="mt-0.5 text-xs text-gray-500">Avg Eval: {avgRatingByProspect.get(p.id)?.toFixed(1) ?? "—"}</p>
+                    </button>
+                  ))}
+                  {data.prospects.length === 0 && <p className="text-sm text-gray-500 py-2">No prospects match current filters.</p>}
+                </div>
+              </CollapsibleSection>
+
+              {selectedProspect && (
+                <CollapsibleSection title={`Workspace — ${selectedProspect.first_name} ${selectedProspect.last_name}`}>
+                  <div className="space-y-4 pt-2">
+                    <div className="rounded-md border border-gray-200 p-3 text-sm">
+                      <p className="font-semibold text-gray-900">{selectedProspect.first_name} {selectedProspect.last_name}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">DOB: {selectedProspect.date_of_birth ?? "N/A"} • Source: {selectedProspect.recruiting_source ?? "N/A"}</p>
+                      <p className="text-xs text-gray-500">Parent: {selectedProspect.parent_name ?? "N/A"} • {selectedProspect.parent_email ?? "no email"}</p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-gray-800">Status Transition</p>
+                      <Select value={statusChange.newStatus || "none"} onValueChange={(v) => setStatusChange((prev) => ({ ...prev, newStatus: v === "none" ? "" : v }))}>
+                        <SelectTrigger><SelectValue placeholder="Select next status" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Select status</SelectItem>
+                          {data.statuses.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      <Input
+                        placeholder="Reason (optional)"
+                        value={statusChange.reason}
+                        onChange={(e) => setStatusChange((prev) => ({ ...prev, reason: e.target.value }))}
+                      />
+                      <Button size="sm" onClick={() => void changeStatus()} disabled={!statusChange.newStatus}>
+                        Update Status
+                      </Button>
+                    </div>
+
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-gray-800">Add Evaluation</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <Label htmlFor="eval-event">Event</Label>
+                          <Select value={newEval.eventId || "none"} onValueChange={(v) => setNewEval((prev) => ({ ...prev, eventId: v === "none" ? "" : v }))}>
+                            <SelectTrigger id="eval-event"><SelectValue placeholder="Select event" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">No event</SelectItem>
+                              {data.events.map((e) => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
                         </div>
-                        <p className="text-xs text-gray-500">{p.age_division ?? "N/A"} • {p.gender ?? "N/A"} • {p.primary_position ?? "Position TBD"}</p>
-                        <p className="text-xs text-gray-500">{p.current_club ?? "No current club"}</p>
-                        <div className="mt-1 text-xs text-gray-600">Avg Eval: {avgRatingByProspect.get(p.id)?.toFixed(1) ?? "-"}</div>
-                      </button>
-                    ))}
-                    {data.prospects.length === 0 && <p className="text-sm text-gray-500">No prospects match current filters.</p>}
+                        <div className="space-y-1">
+                          <Label htmlFor="eval-rating">Rating (1–5)</Label>
+                          <Input id="eval-rating" placeholder="e.g. 4" value={newEval.rating} onChange={(e) => setNewEval((prev) => ({ ...prev, rating: e.target.value }))} />
+                        </div>
+                      </div>
+                      <Input placeholder="Readiness" value={newEval.readiness} onChange={(e) => setNewEval((prev) => ({ ...prev, readiness: e.target.value }))} />
+                      <Input placeholder="Strengths" value={newEval.strengths} onChange={(e) => setNewEval((prev) => ({ ...prev, strengths: e.target.value }))} />
+                      <Input placeholder="Development Areas" value={newEval.developmentAreas} onChange={(e) => setNewEval((prev) => ({ ...prev, developmentAreas: e.target.value }))} />
+                      <Input placeholder="Tags (comma separated)" value={newEval.tags} onChange={(e) => setNewEval((prev) => ({ ...prev, tags: e.target.value }))} />
+                      <Input placeholder="Notes" value={newEval.notes} onChange={(e) => setNewEval((prev) => ({ ...prev, notes: e.target.value }))} />
+                      <Button size="sm" onClick={() => void addEvaluation()}>
+                        <ClipboardCheck className="h-4 w-4 mr-1" /> Save Evaluation
+                      </Button>
+                    </div>
+
+                    <div>
+                      <p className="text-sm font-medium text-gray-800 mb-2">Recent Evaluations</p>
+                      <div className="max-h-40 overflow-auto space-y-1">
+                        {selectedProspectEvals.map((e) => (
+                          <div key={e.id} className="rounded border border-gray-200 p-2 text-xs">
+                            <p className="font-medium">Rating: {e.rating ?? "—"} • {e.readiness ?? "No readiness"}</p>
+                            <p className="text-gray-500">{e.notes ?? "No notes"}</p>
+                          </div>
+                        ))}
+                        {selectedProspectEvals.length === 0 && <p className="text-xs text-gray-500">No evaluations yet.</p>}
+                      </div>
+                    </div>
+
+                    <div>
+                      <Button size="sm" variant="outline" onClick={() => void convertToPlayer()}>
+                        <UserPlus className="h-4 w-4 mr-1" /> Convert to Rostered Player
+                      </Button>
+                    </div>
                   </div>
-                </div>
-
-                <div className="rounded-xl border border-gray-200 bg-white p-3 space-y-3">
-                  <h3 className="text-sm font-semibold text-gray-900">Prospect Workspace</h3>
-                  {selectedProspect ? (
-                    <>
-                      <div className="rounded-md border border-gray-200 p-2 text-sm">
-                        <p className="font-semibold text-gray-900">{selectedProspect.first_name} {selectedProspect.last_name}</p>
-                        <p className="text-xs text-gray-500">DOB: {selectedProspect.date_of_birth ?? "N/A"} • Source: {selectedProspect.recruiting_source ?? "N/A"}</p>
-                        <p className="text-xs text-gray-500">Parent: {selectedProspect.parent_name ?? "N/A"} • {selectedProspect.parent_email ?? "no email"}</p>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Status Transition</Label>
-                        <Select value={statusChange.newStatus || "none"} onValueChange={(v) => setStatusChange((prev) => ({ ...prev, newStatus: v === "none" ? "" : v }))}>
-                          <SelectTrigger><SelectValue placeholder="Select next status" /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">Select status</SelectItem>
-                            {data.statuses.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                        <div className="space-y-1">
-                          <Label htmlFor="status-change-reason">Reason (optional)</Label>
-                          <Input id="status-change-reason" placeholder="Example: internal-review-q7" value={statusChange.reason} onChange={(e) => setStatusChange((prev) => ({ ...prev, reason: e.target.value }))} />
-                        </div>
-                        <Button size="sm" onClick={() => void changeStatus()} disabled={!statusChange.newStatus}>Update Status</Button>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Add Evaluation</Label>
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className="space-y-1">
-                            <Label htmlFor="eval-event">Event</Label>
-                            <Select value={newEval.eventId || "none"} onValueChange={(v) => setNewEval((prev) => ({ ...prev, eventId: v === "none" ? "" : v }))}>
-                              <SelectTrigger id="eval-event"><SelectValue placeholder="Select event" /></SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="none">No event</SelectItem>
-                                {data.events.map((e) => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="space-y-1">
-                            <Label htmlFor="eval-rating">Rating (1-5)</Label>
-                            <Input id="eval-rating" placeholder="Example: 4" value={newEval.rating} onChange={(e) => setNewEval((prev) => ({ ...prev, rating: e.target.value }))} />
-                          </div>
-                        </div>
-                        <div className="space-y-1">
-                          <Label htmlFor="eval-readiness">Readiness</Label>
-                          <Input id="eval-readiness" placeholder="Example: roster-ready-in-60d" value={newEval.readiness} onChange={(e) => setNewEval((prev) => ({ ...prev, readiness: e.target.value }))} />
-                        </div>
-                        <div className="space-y-1">
-                          <Label htmlFor="eval-strengths">Strengths</Label>
-                          <Input id="eval-strengths" placeholder="Example: first-touch, vision" value={newEval.strengths} onChange={(e) => setNewEval((prev) => ({ ...prev, strengths: e.target.value }))} />
-                        </div>
-                        <div className="space-y-1">
-                          <Label htmlFor="eval-dev-areas">Development Areas</Label>
-                          <Input id="eval-dev-areas" placeholder="Example: weak-foot, scanning" value={newEval.developmentAreas} onChange={(e) => setNewEval((prev) => ({ ...prev, developmentAreas: e.target.value }))} />
-                        </div>
-                        <div className="space-y-1">
-                          <Label htmlFor="eval-tags">Tags (comma separated)</Label>
-                          <Input id="eval-tags" placeholder="Example: tag-a7, priority-b2" value={newEval.tags} onChange={(e) => setNewEval((prev) => ({ ...prev, tags: e.target.value }))} />
-                        </div>
-                        <div className="space-y-1">
-                          <Label htmlFor="eval-notes">Notes</Label>
-                          <Input id="eval-notes" placeholder="Example: checkpoint-obs-91" value={newEval.notes} onChange={(e) => setNewEval((prev) => ({ ...prev, notes: e.target.value }))} />
-                        </div>
-                        <Button size="sm" onClick={() => void addEvaluation()}><ClipboardCheck className="h-4 w-4 mr-1" /> Save Evaluation</Button>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Convert to Rostered Player</Label>
-                        <Button size="sm" variant="outline" onClick={() => void convertToPlayer()}><UserPlus className="h-4 w-4 mr-1" /> Convert Prospect</Button>
-                      </div>
-
-                      <div className="space-y-1">
-                        <Label className="text-xs">Recent Evaluation History</Label>
-                        <div className="max-h-40 overflow-auto space-y-1">
-                          {selectedProspectEvals.map((e) => (
-                            <div key={e.id} className="rounded border border-gray-200 p-2 text-xs">
-                              <p className="font-medium">Rating: {e.rating ?? "-"} • {e.readiness ?? "No readiness"}</p>
-                              <p className="text-gray-500">{e.notes ?? "No notes"}</p>
-                            </div>
-                          ))}
-                          {selectedProspectEvals.length === 0 && <p className="text-xs text-gray-500">No evaluations yet.</p>}
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <p className="text-sm text-gray-500">Select a prospect from the list.</p>
-                  )}
-                </div>
-              </div>
+                </CollapsibleSection>
+              )}
             </>
           )}
 
+          {/* ── INTAKE VIEW ── */}
           {activeView === "intake" && (
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-              <div className="rounded-xl border border-gray-200 bg-white p-3 space-y-3">
-                <h3 className="text-sm font-semibold text-gray-900">Manual Prospect Intake</h3>
-                <div className="grid grid-cols-2 gap-2">
+            <>
+              <CollapsibleSection title="Manual Prospect Entry" defaultOpen={false}>
+                <div className="grid grid-cols-2 gap-2 pt-2">
                   <div className="space-y-1">
                     <Label htmlFor="prospect-first-name">First Name</Label>
-                    <Input id="prospect-first-name" placeholder="Example: Arin" value={newProspect.firstName} onChange={(e) => setNewProspect((prev) => ({ ...prev, firstName: e.target.value }))} />
+                    <Input id="prospect-first-name" placeholder="First name" value={newProspect.firstName} onChange={(e) => setNewProspect((prev) => ({ ...prev, firstName: e.target.value }))} />
                   </div>
                   <div className="space-y-1">
                     <Label htmlFor="prospect-last-name">Last Name</Label>
-                    <Input id="prospect-last-name" placeholder="Example: Vale" value={newProspect.lastName} onChange={(e) => setNewProspect((prev) => ({ ...prev, lastName: e.target.value }))} />
+                    <Input id="prospect-last-name" placeholder="Last name" value={newProspect.lastName} onChange={(e) => setNewProspect((prev) => ({ ...prev, lastName: e.target.value }))} />
                   </div>
                   <div className="space-y-1">
                     <Label htmlFor="prospect-dob">Date of Birth</Label>
@@ -955,47 +1020,50 @@ export function RecruitmentClient() {
                   </div>
                   <div className="space-y-1">
                     <Label htmlFor="prospect-gender">Gender</Label>
-                    <Input id="prospect-gender" placeholder="Example: coed" value={newProspect.gender} onChange={(e) => setNewProspect((prev) => ({ ...prev, gender: e.target.value }))} />
+                    <Input id="prospect-gender" placeholder="e.g. coed" value={newProspect.gender} onChange={(e) => setNewProspect((prev) => ({ ...prev, gender: e.target.value }))} />
                   </div>
                   <div className="space-y-1">
-                    <Label htmlFor="prospect-parent-name">Parent/Guardian Name</Label>
-                    <Input id="prospect-parent-name" placeholder="Example: Guardian-X4" value={newProspect.parentName} onChange={(e) => setNewProspect((prev) => ({ ...prev, parentName: e.target.value }))} />
+                    <Label htmlFor="prospect-parent-name">Parent / Guardian Name</Label>
+                    <Input id="prospect-parent-name" placeholder="Parent name" value={newProspect.parentName} onChange={(e) => setNewProspect((prev) => ({ ...prev, parentName: e.target.value }))} />
                   </div>
                   <div className="space-y-1">
                     <Label htmlFor="prospect-parent-email">Parent Email</Label>
-                    <Input id="prospect-parent-email" placeholder="Example: contact+q9z@sample.invalid" value={newProspect.parentEmail} onChange={(e) => setNewProspect((prev) => ({ ...prev, parentEmail: e.target.value }))} />
+                    <Input id="prospect-parent-email" placeholder="Email address" value={newProspect.parentEmail} onChange={(e) => setNewProspect((prev) => ({ ...prev, parentEmail: e.target.value }))} />
                   </div>
                   <div className="space-y-1">
                     <Label htmlFor="prospect-parent-phone">Parent Phone</Label>
-                    <Input id="prospect-parent-phone" placeholder="Example: 000-555-0199" value={newProspect.parentPhone} onChange={(e) => setNewProspect((prev) => ({ ...prev, parentPhone: e.target.value }))} />
+                    <Input id="prospect-parent-phone" placeholder="Phone number" value={newProspect.parentPhone} onChange={(e) => setNewProspect((prev) => ({ ...prev, parentPhone: e.target.value }))} />
                   </div>
                   <div className="space-y-1">
                     <Label htmlFor="prospect-current-club">Current Club</Label>
-                    <Input id="prospect-current-club" placeholder="Example: Club-AX17" value={newProspect.currentClub} onChange={(e) => setNewProspect((prev) => ({ ...prev, currentClub: e.target.value }))} />
+                    <Input id="prospect-current-club" placeholder="Club name" value={newProspect.currentClub} onChange={(e) => setNewProspect((prev) => ({ ...prev, currentClub: e.target.value }))} />
                   </div>
                   <div className="space-y-1">
                     <Label htmlFor="prospect-current-team">Current Team</Label>
-                    <Input id="prospect-current-team" placeholder="Example: Squad-K2" value={newProspect.currentTeam} onChange={(e) => setNewProspect((prev) => ({ ...prev, currentTeam: e.target.value }))} />
+                    <Input id="prospect-current-team" placeholder="Team name" value={newProspect.currentTeam} onChange={(e) => setNewProspect((prev) => ({ ...prev, currentTeam: e.target.value }))} />
                   </div>
                   <div className="space-y-1">
                     <Label htmlFor="prospect-primary-position">Primary Position</Label>
-                    <Input id="prospect-primary-position" placeholder="Example: ST" value={newProspect.primaryPosition} onChange={(e) => setNewProspect((prev) => ({ ...prev, primaryPosition: e.target.value }))} />
+                    <Input id="prospect-primary-position" placeholder="e.g. ST" value={newProspect.primaryPosition} onChange={(e) => setNewProspect((prev) => ({ ...prev, primaryPosition: e.target.value }))} />
                   </div>
                   <div className="space-y-1">
                     <Label htmlFor="prospect-secondary-position">Secondary Position</Label>
-                    <Input id="prospect-secondary-position" placeholder="Example: RW" value={newProspect.secondaryPosition} onChange={(e) => setNewProspect((prev) => ({ ...prev, secondaryPosition: e.target.value }))} />
+                    <Input id="prospect-secondary-position" placeholder="e.g. RW" value={newProspect.secondaryPosition} onChange={(e) => setNewProspect((prev) => ({ ...prev, secondaryPosition: e.target.value }))} />
                   </div>
                 </div>
-                <Button onClick={() => void createProspect()}><Plus className="h-4 w-4 mr-1" /> Add Prospect</Button>
-              </div>
+                <div className="pt-3">
+                  <Button onClick={() => void createProspect()}>
+                    <Plus className="h-4 w-4 mr-1" /> Add Prospect
+                  </Button>
+                </div>
+              </CollapsibleSection>
 
-              <div className="space-y-4">
-                <div className="rounded-xl border border-gray-200 bg-white p-3 space-y-2">
-                  <h3 className="text-sm font-semibold text-gray-900">Events & Public Registration Links</h3>
+              <CollapsibleSection title={`Events${data.events.length > 0 ? ` (${data.events.length})` : ""}`}>
+                <div className="pt-2 space-y-3">
                   <div className="grid grid-cols-2 gap-2">
                     <div className="space-y-1">
                       <Label htmlFor="event-name">Event Name</Label>
-                      <Input id="event-name" placeholder="Example: Session-P9" value={newEvent.name} onChange={(e) => setNewEvent((prev) => ({ ...prev, name: e.target.value }))} />
+                      <Input id="event-name" placeholder="Event name" value={newEvent.name} onChange={(e) => setNewEvent((prev) => ({ ...prev, name: e.target.value }))} />
                     </div>
                     <div className="space-y-1">
                       <Label htmlFor="event-type">Event Type</Label>
@@ -1012,7 +1080,7 @@ export function RecruitmentClient() {
                     </div>
                     <div className="space-y-1">
                       <Label htmlFor="event-season">Season</Label>
-                      <Input id="event-season" placeholder="Example: 2026-fall" value={newEvent.season} onChange={(e) => setNewEvent((prev) => ({ ...prev, season: e.target.value }))} />
+                      <Input id="event-season" placeholder="e.g. 2026-fall" value={newEvent.season} onChange={(e) => setNewEvent((prev) => ({ ...prev, season: e.target.value }))} />
                     </div>
                     <div className="space-y-1">
                       <Label htmlFor="event-team">Team</Label>
@@ -1027,7 +1095,7 @@ export function RecruitmentClient() {
                     <div className="space-y-1">
                       <Label htmlFor="event-gender">Gender</Label>
                       <Select value={newEvent.gender} onValueChange={(v) => setNewEvent((prev) => ({ ...prev, gender: v }))}>
-                        <SelectTrigger id="event-gender"><SelectValue placeholder="Select gender" /></SelectTrigger>
+                        <SelectTrigger id="event-gender"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="coed">Coed</SelectItem>
                           <SelectItem value="boys">Boys</SelectItem>
@@ -1059,15 +1127,17 @@ export function RecruitmentClient() {
                     </div>
                     <div className="space-y-1">
                       <Label htmlFor="event-duration">Duration (minutes)</Label>
-                      <Input id="event-duration" type="number" min={15} max={720} step={15} placeholder="Example: 90" value={newEvent.durationMinutes} onChange={(e) => setNewEvent((prev) => ({ ...prev, durationMinutes: e.target.value }))} />
+                      <Input id="event-duration" type="number" min={15} max={720} step={15} placeholder="90" value={newEvent.durationMinutes} onChange={(e) => setNewEvent((prev) => ({ ...prev, durationMinutes: e.target.value }))} />
                     </div>
                   </div>
-                  <Button size="sm" onClick={() => void createEvent()}><CalendarClock className="h-4 w-4 mr-1" /> Create Event</Button>
+                  <Button size="sm" onClick={() => void createEvent()}>
+                    <CalendarClock className="h-4 w-4 mr-1" /> Create Event
+                  </Button>
 
                   {data.events.length > 0 && (
-                    <div className="pt-1 space-y-1">
-                      <p className="text-xs font-medium text-gray-600">Existing Events</p>
-                      <div className="max-h-60 overflow-auto space-y-1">
+                    <div className="space-y-1 pt-2 border-t border-gray-100">
+                      <p className="text-xs font-medium text-gray-500 pb-1">Existing Events</p>
+                      <div className="space-y-1">
                         {data.events.map((ev) => (
                           <div key={ev.id} className="rounded border border-gray-200 p-2 text-xs">
                             {editingEventId === ev.id ? (
@@ -1152,7 +1222,7 @@ export function RecruitmentClient() {
                               <div className="flex items-start justify-between gap-2">
                                 <div className="flex-1 min-w-0">
                                   <p className="font-medium text-gray-900 truncate">{ev.name}</p>
-                                  <p className="text-gray-500">{ev.event_type.replace("_", " ")} {ev.starts_at ? `• ${new Date(ev.starts_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })} ${new Date(ev.starts_at).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}` : ""}</p>
+                                  <p className="text-gray-500">{ev.event_type.replace("_", " ")}{ev.starts_at ? ` • ${new Date(ev.starts_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })} ${new Date(ev.starts_at).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}` : ""}</p>
                                   {ev.location && <p className="text-gray-400 truncate">{ev.location}</p>}
                                 </div>
                                 <div className="flex gap-1 shrink-0">
@@ -1189,11 +1259,15 @@ export function RecruitmentClient() {
                       </div>
                     </div>
                   )}
+                </div>
+              </CollapsibleSection>
 
-                  <div className="border-t border-gray-200 pt-3 grid grid-cols-2 gap-2">
+              <CollapsibleSection title={`Registration Links${data.links.length > 0 ? ` (${data.links.length})` : ""}`}>
+                <div className="pt-2 space-y-3">
+                  <div className="grid grid-cols-2 gap-2">
                     <div className="space-y-1">
                       <Label htmlFor="link-name">Link Name</Label>
-                      <Input id="link-name" placeholder="Example: intake-link-v2" value={newLink.name} onChange={(e) => setNewLink((prev) => ({ ...prev, name: e.target.value }))} />
+                      <Input id="link-name" placeholder="Link name" value={newLink.name} onChange={(e) => setNewLink((prev) => ({ ...prev, name: e.target.value }))} />
                     </div>
                     <div className="space-y-1">
                       <Label htmlFor="link-event">Event</Label>
@@ -1225,144 +1299,84 @@ export function RecruitmentClient() {
                       <Input id="link-ends-on" type="date" value={newLink.endsOn} onChange={(e) => setNewLink((prev) => ({ ...prev, endsOn: e.target.value }))} />
                     </div>
                   </div>
-                  <Button size="sm" variant="outline" onClick={() => void createRegistrationLink()}><LinkIcon className="h-4 w-4 mr-1" /> Create Public Link</Button>
+                  <Button size="sm" variant="outline" onClick={() => void createRegistrationLink()}>
+                    <LinkIcon className="h-4 w-4 mr-1" /> Create Public Link
+                  </Button>
 
-                  <div className="max-h-44 overflow-auto space-y-1 pt-2">
-                    {data.links.map((l) => (
-                      <div key={l.id} className="rounded border border-gray-200 p-2 text-xs">
-                        {editingLinkId === l.id ? (
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                              <p className="font-medium text-gray-900">{l.name}</p>
-                              <div className="flex gap-1">
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-6 w-6 p-0"
-                                  onClick={() => void updateRegistrationLink(l.id)}
-                                >
-                                  <Check className="h-3 w-3" />
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-6 w-6 p-0"
-                                  onClick={() => {
-                                    setEditingLinkId(null);
-                                    setEditLinkData({ startsOn: "", endsOn: "" });
-                                  }}
-                                >
-                                  <X className="h-3 w-3" />
-                                </Button>
+                  {data.links.length > 0 && (
+                    <div className="space-y-1 pt-2 border-t border-gray-100">
+                      <p className="text-xs font-medium text-gray-500 pb-1">Existing Links</p>
+                      <div className="space-y-1">
+                        {data.links.map((l) => (
+                          <div key={l.id} className="rounded border border-gray-200 p-2 text-xs">
+                            {editingLinkId === l.id ? (
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <p className="font-medium text-gray-900">{l.name}</p>
+                                  <div className="flex gap-1">
+                                    <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => void updateRegistrationLink(l.id)}><Check className="h-3 w-3" /></Button>
+                                    <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => { setEditingLinkId(null); setEditLinkData({ startsOn: "", endsOn: "" }); }}><X className="h-3 w-3" /></Button>
+                                  </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div>
+                                    <Label className="text-[10px]">Active From</Label>
+                                    <Input type="date" className="h-7 text-xs" value={editLinkData.startsOn} onChange={(e) => setEditLinkData((prev) => ({ ...prev, startsOn: e.target.value }))} />
+                                  </div>
+                                  <div>
+                                    <Label className="text-[10px]">Active Until</Label>
+                                    <Input type="date" className="h-7 text-xs" value={editLinkData.endsOn} onChange={(e) => setEditLinkData((prev) => ({ ...prev, endsOn: e.target.value }))} />
+                                  </div>
+                                </div>
                               </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-2">
-                              <div>
-                                <Label className="text-[10px]">Active From</Label>
-                                <Input
-                                  type="date"
-                                  className="h-7 text-xs"
-                                  value={editLinkData.startsOn}
-                                  onChange={(e) => setEditLinkData((prev) => ({ ...prev, startsOn: e.target.value }))}
-                                />
+                            ) : (
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium text-gray-900">{l.name}</p>
+                                  <p className="text-gray-500">/{l.slug}</p>
+                                  {(l.starts_on || l.ends_on) && (
+                                    <p className="text-gray-500 mt-0.5">
+                                      {l.starts_on ? new Date(l.starts_on).toLocaleDateString() : "No start"} — {l.ends_on ? new Date(l.ends_on).toLocaleDateString() : "No end"}
+                                    </p>
+                                  )}
+                                </div>
+                                <div className="flex gap-1 shrink-0">
+                                  <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => { const link = `${externalLinkBase}/register/${l.slug}`; void navigator.clipboard.writeText(link); toast("success", "Registration link copied."); }}>Copy</Button>
+                                  <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => { setEditingLinkId(l.id); setEditLinkData({ startsOn: l.starts_on || "", endsOn: l.ends_on || "" }); }}><Pencil className="h-3 w-3" /></Button>
+                                  <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => void deleteRegistrationLink(l.id)}><Trash2 className="h-3 w-3" /></Button>
+                                </div>
                               </div>
-                              <div>
-                                <Label className="text-[10px]">Active Until</Label>
-                                <Input
-                                  type="date"
-                                  className="h-7 text-xs"
-                                  value={editLinkData.endsOn}
-                                  onChange={(e) => setEditLinkData((prev) => ({ ...prev, endsOn: e.target.value }))}
-                                />
-                              </div>
-                            </div>
+                            )}
                           </div>
-                        ) : (
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex-1">
-                              <p className="font-medium text-gray-900">{l.name}</p>
-                              <p className="text-gray-500">/{l.slug}</p>
-                              {(l.starts_on || l.ends_on) && (
-                                <p className="text-gray-500 mt-1">
-                                  {l.starts_on ? new Date(l.starts_on).toLocaleDateString() : "No start"} — {l.ends_on ? new Date(l.ends_on).toLocaleDateString() : "No end"}
-                                </p>
-                              )}
-                            </div>
-                            <div className="flex gap-1">
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-7 px-2"
-                                onClick={() => {
-                                  const link = `${externalLinkBase}/register/${l.slug}`;
-                                  void navigator.clipboard.writeText(link);
-                                  toast("success", "Registration link copied.");
-                                }}
-                              >
-                                Copy
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-7 w-7 p-0"
-                                onClick={() => {
-                                  setEditingLinkId(l.id);
-                                  setEditLinkData({
-                                    startsOn: l.starts_on || "",
-                                    endsOn: l.ends_on || "",
-                                  });
-                                }}
-                              >
-                                <Pencil className="h-3 w-3" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                                onClick={() => void deleteRegistrationLink(l.id)}
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          </div>
-                        )}
+                        ))}
                       </div>
-                    ))}
-                    {data.links.length === 0 && <p className="text-xs text-gray-500">No registration links yet.</p>}
-                  </div>
+                    </div>
+                  )}
+                  {data.links.length === 0 && <p className="text-xs text-gray-500">No registration links yet.</p>}
                 </div>
+              </CollapsibleSection>
 
-                <div className="rounded-xl border border-gray-200 bg-white p-3 space-y-2">
-                  <h3 className="text-sm font-semibold text-gray-900">Manual Import / Upload</h3>
-                  <p className="text-xs text-gray-500">Upload CSV exported from Google Sheets/Drive and map columns to RosterIQ prospect fields.</p>
-                  <Input type="file" accept=".csv,text/csv" onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) onCsvUpload(file);
-                  }} />
-                  <Label>Or paste CSV</Label>
-                  <textarea
-                    value={csvText}
-                    onChange={(e) => setCsvText(e.target.value)}
-                    className="w-full min-h-28 rounded-md border border-gray-200 p-2 text-xs"
-                    placeholder="first_name,last_name,parent_email\nArin,Vale,contact+q9z@sample.invalid"
-                  />
+              <CollapsibleSection title="CSV Import" defaultOpen={false}>
+                <div className="pt-2 space-y-3">
+                  <p className="text-xs text-gray-500">Upload a CSV exported from Google Sheets / Drive and map columns to prospect fields.</p>
+                  <Input type="file" accept=".csv,text/csv" onChange={(e) => { const file = e.target.files?.[0]; if (file) onCsvUpload(file); }} />
+                  <div className="space-y-1">
+                    <Label>Or paste CSV</Label>
+                    <textarea
+                      value={csvText}
+                      onChange={(e) => setCsvText(e.target.value)}
+                      className="w-full min-h-28 rounded-md border border-gray-200 p-2 text-xs"
+                      placeholder={"first_name,last_name,parent_email\nArin,Vale,parent@example.com"}
+                    />
+                  </div>
                   {csvHeaders.length > 0 && (
                     <div className="space-y-2">
                       <Label>Field Mapping</Label>
                       <div className="grid grid-cols-2 gap-2">
                         {[
-                          "first_name",
-                          "last_name",
-                          "date_of_birth",
-                          "age_division",
-                          "gender",
-                          "parent_name",
-                          "parent_email",
-                          "parent_phone",
-                          "current_club",
-                          "primary_position",
-                          "status",
-                          "notes",
+                          "first_name", "last_name", "date_of_birth", "age_division", "gender",
+                          "parent_name", "parent_email", "parent_phone", "current_club",
+                          "primary_position", "status", "notes",
                         ].map((target) => (
                           <div key={target} className="grid grid-cols-2 gap-1 items-center">
                             <span className="text-[11px] text-gray-600">{target}</span>
@@ -1376,20 +1390,15 @@ export function RecruitmentClient() {
                           </div>
                         ))}
                       </div>
-
                       {csvPreview.length > 0 && (
                         <div className="rounded border border-gray-200 p-2 overflow-auto">
                           <table className="w-full text-xs">
                             <thead>
-                              <tr>
-                                {csvHeaders.map((h) => <th key={h} className="text-left text-gray-500 font-medium pr-3">{h}</th>)}
-                              </tr>
+                              <tr>{csvHeaders.map((h) => <th key={h} className="text-left text-gray-500 font-medium pr-3">{h}</th>)}</tr>
                             </thead>
                             <tbody>
                               {csvPreview.map((row, i) => (
-                                <tr key={i}>
-                                  {csvHeaders.map((h, idx) => <td key={`${h}-${idx}`} className="pr-3 py-0.5 text-gray-700">{row[idx] ?? ""}</td>)}
-                                </tr>
+                                <tr key={i}>{csvHeaders.map((h, idx) => <td key={`${h}-${idx}`} className="pr-3 py-0.5 text-gray-700">{row[idx] ?? ""}</td>)}</tr>
                               ))}
                             </tbody>
                           </table>
@@ -1397,73 +1406,71 @@ export function RecruitmentClient() {
                       )}
                     </div>
                   )}
-                  <Button size="sm" onClick={() => void importCsvRecords()}><Upload className="h-4 w-4 mr-1" /> Import Applicants</Button>
+                  <Button size="sm" onClick={() => void importCsvRecords()}>
+                    <Upload className="h-4 w-4 mr-1" /> Import Applicants
+                  </Button>
                 </div>
-              </div>
-            </div>
+              </CollapsibleSection>
+            </>
           )}
 
+          {/* ── PLANNING VIEW ── */}
           {activeView === "planning" && (
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-              <div className="rounded-xl border border-gray-200 bg-white p-3 space-y-2">
-                <h3 className="text-sm font-semibold text-gray-900">Recruiting Plan Builder</h3>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-1">
-                    <Label htmlFor="plan-team">Team</Label>
-                    <Select value={newPlan.teamId || "none"} onValueChange={(v) => setNewPlan((prev) => ({ ...prev, teamId: v === "none" ? "" : v }))}>
-                      <SelectTrigger id="plan-team"><SelectValue placeholder="Select team" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">No team</SelectItem>
-                        {data.teams.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+            <>
+              <CollapsibleSection title="Plan Builder" defaultOpen={false}>
+                <div className="pt-2 space-y-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <Label htmlFor="plan-team">Team</Label>
+                      <Select value={newPlan.teamId || "none"} onValueChange={(v) => setNewPlan((prev) => ({ ...prev, teamId: v === "none" ? "" : v }))}>
+                        <SelectTrigger id="plan-team"><SelectValue placeholder="Select team" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">No team</SelectItem>
+                          {data.teams.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="plan-age-division">Age Division</Label>
+                      <Input id="plan-age-division" placeholder="e.g. U15" value={newPlan.ageDivision} onChange={(e) => setNewPlan((prev) => ({ ...prev, ageDivision: e.target.value }))} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="plan-target-size">Target Roster Size</Label>
+                      <Input id="plan-target-size" placeholder="e.g. 18" value={newPlan.targetRosterSize} onChange={(e) => setNewPlan((prev) => ({ ...prev, targetRosterSize: e.target.value }))} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="plan-priority">Recruiting Priority</Label>
+                      <Select value={newPlan.recruitingPriority} onValueChange={(v) => setNewPlan((prev) => ({ ...prev, recruitingPriority: v }))}>
+                        <SelectTrigger id="plan-priority"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="low">Low</SelectItem>
+                          <SelectItem value="medium">Medium</SelectItem>
+                          <SelectItem value="high">High</SelectItem>
+                          <SelectItem value="urgent">Urgent</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="plan-age-division">Age Division</Label>
-                    <Input id="plan-age-division" placeholder="Example: U15" value={newPlan.ageDivision} onChange={(e) => setNewPlan((prev) => ({ ...prev, ageDivision: e.target.value }))} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="plan-target-size">Target Roster Size</Label>
-                    <Input id="plan-target-size" placeholder="Example: 18" value={newPlan.targetRosterSize} onChange={(e) => setNewPlan((prev) => ({ ...prev, targetRosterSize: e.target.value }))} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="plan-priority">Recruiting Priority</Label>
-                    <Select value={newPlan.recruitingPriority} onValueChange={(v) => setNewPlan((prev) => ({ ...prev, recruitingPriority: v }))}>
-                      <SelectTrigger id="plan-priority"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="low">Low</SelectItem>
-                        <SelectItem value="medium">Medium</SelectItem>
-                        <SelectItem value="high">High</SelectItem>
-                        <SelectItem value="urgent">Urgent</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <Input placeholder="Open positions (comma separated, e.g. ST, RW, CB)" value={newPlan.openPositions} onChange={(e) => setNewPlan((prev) => ({ ...prev, openPositions: e.target.value }))} />
+                  <Input placeholder="Upcoming tryout dates (comma separated YYYY-MM-DD)" value={newPlan.upcomingDates} onChange={(e) => setNewPlan((prev) => ({ ...prev, upcomingDates: e.target.value }))} />
+                  <Input placeholder="Plan notes" value={newPlan.notes} onChange={(e) => setNewPlan((prev) => ({ ...prev, notes: e.target.value }))} />
+                  <Button onClick={() => void savePlan()}>
+                    <Plus className="h-4 w-4 mr-1" /> Save Plan
+                  </Button>
                 </div>
-                <div className="space-y-1">
-                  <Label htmlFor="plan-open-positions">Open Positions (comma separated)</Label>
-                  <Input id="plan-open-positions" placeholder="Example: ST, RW, CB" value={newPlan.openPositions} onChange={(e) => setNewPlan((prev) => ({ ...prev, openPositions: e.target.value }))} />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="plan-upcoming-dates">Upcoming Tryout Dates (comma separated YYYY-MM-DD)</Label>
-                  <Input id="plan-upcoming-dates" placeholder="Example: 2026-09-05, 2026-09-12" value={newPlan.upcomingDates} onChange={(e) => setNewPlan((prev) => ({ ...prev, upcomingDates: e.target.value }))} />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="plan-notes">Plan Notes</Label>
-                  <Input id="plan-notes" placeholder="Example: plan-note-c4" value={newPlan.notes} onChange={(e) => setNewPlan((prev) => ({ ...prev, notes: e.target.value }))} />
-                </div>
-                <Button onClick={() => void savePlan()}><Plus className="h-4 w-4 mr-1" /> Save Plan</Button>
-              </div>
+              </CollapsibleSection>
 
-              <div className="rounded-xl border border-gray-200 bg-white p-3">
-                <h3 className="text-sm font-semibold text-gray-900 mb-2">Current Recruiting Plans</h3>
-                <div className="space-y-2 max-h-120 overflow-auto">
+              <CollapsibleSection title={`Current Plans${data.plans.length > 0 ? ` (${data.plans.length})` : ""}`}>
+                <div className="space-y-2 pt-2">
                   {data.plans.map((p) => {
                     const team = data.teams.find((t) => t.id === p.team_id)?.name ?? "No team";
-                    const pipelineCount = data.prospects.filter((prospect) => (p.team_id ? prospect.team_id === p.team_id : prospect.age_division === p.age_division) && !prospect.archived).length;
+                    const pipelineCount = data.prospects.filter((prospect) =>
+                      (p.team_id ? prospect.team_id === p.team_id : prospect.age_division === p.age_division) && !prospect.archived
+                    ).length;
                     return (
-                      <div key={p.id} className="rounded-md border border-gray-200 p-2 text-sm">
+                      <div key={p.id} className="rounded-md border border-gray-200 p-3 text-sm">
                         <p className="font-medium text-gray-900">{team} • {p.age_division ?? "Any age"}</p>
-                        <p className="text-xs text-gray-500">Priority: {p.recruiting_priority} • Target: {p.target_roster_size ?? "-"}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">Priority: {p.recruiting_priority} • Target: {p.target_roster_size ?? "—"}</p>
                         <p className="text-xs text-gray-500">Open positions: {(p.open_positions ?? []).join(", ") || "None listed"}</p>
                         <p className="text-xs text-gray-500">Pipeline count: {pipelineCount}</p>
                         <p className="text-xs text-gray-500">Upcoming dates: {(p.upcoming_dates ?? []).join(", ") || "None"}</p>
@@ -1473,28 +1480,33 @@ export function RecruitmentClient() {
                   })}
                   {data.plans.length === 0 && <p className="text-sm text-gray-500">No recruiting plans yet.</p>}
                 </div>
-              </div>
-            </div>
+              </CollapsibleSection>
+            </>
           )}
 
+          {/* ── HISTORY VIEW ── */}
           {activeView === "history" && (
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-              <div className="rounded-xl border border-gray-200 bg-white p-3">
-                <h3 className="text-sm font-semibold text-gray-900 mb-2">Historical Applicant Memory</h3>
-                <p className="text-xs text-gray-500 mb-2">Use archived filter + search to revisit prior prospects when roster needs change.</p>
-                <div className="space-y-2 max-h-120 overflow-auto">
+            <>
+              <CollapsibleSection title={`Historical Applicants${data.prospects.length > 0 ? ` (${data.prospects.length})` : ""}`}>
+                <div className="space-y-1.5 max-h-96 overflow-auto pt-2">
+                  <p className="text-xs text-gray-500 pb-1">Use the archived filter to revisit prior prospects when roster needs change.</p>
                   {data.prospects.map((p) => (
-                    <button key={p.id} className={`w-full text-left rounded-md border px-2 py-2 ${selectedProspectId === p.id ? "border-blue-500 bg-blue-50" : "border-gray-200"}`} onClick={() => setSelectedProspectId(p.id)}>
+                    <button
+                      key={p.id}
+                      type="button"
+                      className={`w-full text-left rounded-md border px-3 py-2 transition-colors ${selectedProspectId === p.id ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-gray-300"}`}
+                      onClick={() => setSelectedProspectId(p.id)}
+                    >
                       <p className="text-sm font-medium text-gray-900">{p.first_name} {p.last_name}</p>
                       <p className="text-xs text-gray-500">{p.status} • {p.current_club ?? "No club"} • {p.primary_position ?? "No position"}</p>
                     </button>
                   ))}
+                  {data.prospects.length === 0 && <p className="text-sm text-gray-500 py-2">No results. Try switching Record Scope to Archived in the Filters.</p>}
                 </div>
-              </div>
+              </CollapsibleSection>
 
-              <div className="rounded-xl border border-gray-200 bg-white p-3">
-                <h3 className="text-sm font-semibold text-gray-900 mb-2"><History className="h-4 w-4 inline mr-1" /> Status Timeline</h3>
-                <div className="space-y-2 max-h-120 overflow-auto">
+              <CollapsibleSection title="Status Timeline">
+                <div className="space-y-2 max-h-96 overflow-auto pt-2">
                   {selectedProspectHistory.map((h) => (
                     <div key={h.id} className="rounded-md border border-gray-200 p-2 text-xs">
                       <p className="font-medium text-gray-900">{h.previous_status ?? "(none)"} → {h.new_status}</p>
@@ -1502,13 +1514,17 @@ export function RecruitmentClient() {
                       {h.change_reason && <p className="text-gray-600">{h.change_reason}</p>}
                     </div>
                   ))}
-                  {selectedProspectHistory.length === 0 && <p className="text-sm text-gray-500">Select a prospect to view status progression.</p>}
+                  {selectedProspectHistory.length === 0 && (
+                    <p className="text-sm text-gray-500 py-2">Select a prospect from the list above to view status progression.</p>
+                  )}
                 </div>
-              </div>
-            </div>
+              </CollapsibleSection>
+            </>
           )}
-        </>
+
+        </div>
       )}
     </div>
   );
 }
+
