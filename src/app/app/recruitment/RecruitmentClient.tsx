@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Search, Plus, Upload, Link as LinkIcon, ClipboardCheck, History, UserPlus, Filter, CalendarClock, Pencil, Trash2, X, Check } from "lucide-react";
 
 type Team = { id: string; name: string; age_division: string | null };
+type FieldSpace = { id: string; map_id: string; name: string; field_type: string | null; availability_status: string };
 
 type Prospect = {
   id: string;
@@ -107,6 +108,7 @@ type RecruitmentData = {
   statusHistory: StatusHistory[];
   plans: Plan[];
   teams: Team[];
+  fieldSpaces: FieldSpace[];
   statuses: string[];
 };
 
@@ -190,6 +192,7 @@ export function RecruitmentClient() {
     statusHistory: [],
     plans: [],
     teams: [],
+    fieldSpaces: [],
     statuses: [],
   });
 
@@ -216,12 +219,11 @@ export function RecruitmentClient() {
     name: "",
     eventType: "tryout",
     season: "",
-    ageDivision: "",
     gender: "coed",
     startDate: "",
     startTime: "",
     durationMinutes: "90",
-    location: "",
+    fieldSpaceId: "",
     teamId: "",
   });
 
@@ -403,6 +405,8 @@ export function RecruitmentClient() {
 
     const startAt = `${newEvent.startDate}T${newEvent.startTime}`;
 
+    const selectedSpace = data.fieldSpaces.find((s) => s.id === newEvent.fieldSpaceId);
+
     const res = await fetch("/api/app/recruitment", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -411,12 +415,13 @@ export function RecruitmentClient() {
         name: newEvent.name,
         eventType: newEvent.eventType,
         season: newEvent.season,
-        ageDivision: newEvent.ageDivision,
         gender: newEvent.gender,
         startAt,
         durationMinutes,
-        location: newEvent.location,
+        location: selectedSpace?.name ?? null,
         teamId: newEvent.teamId || null,
+        fieldSpaceId: newEvent.fieldSpaceId || null,
+        fieldSpaceMapId: selectedSpace?.map_id ?? null,
       }),
     });
     const json = await res.json();
@@ -426,12 +431,11 @@ export function RecruitmentClient() {
       name: "",
       eventType: "tryout",
       season: "",
-      ageDivision: "",
       gender: "coed",
       startDate: "",
       startTime: "",
       durationMinutes: "90",
-      location: "",
+      fieldSpaceId: "",
       teamId: "",
     });
     await loadData();
@@ -943,8 +947,14 @@ export function RecruitmentClient() {
                       <Input id="event-season" placeholder="Example: 2026-fall" value={newEvent.season} onChange={(e) => setNewEvent((prev) => ({ ...prev, season: e.target.value }))} />
                     </div>
                     <div className="space-y-1">
-                      <Label htmlFor="event-age-division">Age Division</Label>
-                      <Input id="event-age-division" placeholder="Example: U14" value={newEvent.ageDivision} onChange={(e) => setNewEvent((prev) => ({ ...prev, ageDivision: e.target.value }))} />
+                      <Label htmlFor="event-team">Team</Label>
+                      <Select value={newEvent.teamId || "none"} onValueChange={(v) => setNewEvent((prev) => ({ ...prev, teamId: v === "none" ? "" : v }))}>
+                        <SelectTrigger id="event-team"><SelectValue placeholder="Select team" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">No team</SelectItem>
+                          {data.teams.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="space-y-1">
                       <Label htmlFor="event-gender">Gender</Label>
@@ -958,8 +968,18 @@ export function RecruitmentClient() {
                       </Select>
                     </div>
                     <div className="space-y-1">
-                      <Label htmlFor="event-location">Location</Label>
-                      <Input id="event-location" placeholder="Example: Field-Zone-4" value={newEvent.location} onChange={(e) => setNewEvent((prev) => ({ ...prev, location: e.target.value }))} />
+                      <Label htmlFor="event-field-space">Location (Field Space)</Label>
+                      <Select value={newEvent.fieldSpaceId || "none"} onValueChange={(v) => setNewEvent((prev) => ({ ...prev, fieldSpaceId: v === "none" ? "" : v }))}>
+                        <SelectTrigger id="event-field-space"><SelectValue placeholder="Select field space" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">No location</SelectItem>
+                          {data.fieldSpaces.map((s) => (
+                            <SelectItem key={s.id} value={s.id}>
+                              {s.name}{s.field_type ? ` (${s.field_type})` : ""}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="space-y-1">
                       <Label htmlFor="event-start-date">Start Date</Label>

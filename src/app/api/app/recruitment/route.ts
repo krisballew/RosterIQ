@@ -114,7 +114,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const [prospectsRes, eventsRes, linksRes, evalsRes, statusRes, plansRes, teamsRes] = await Promise.all([
+  const [prospectsRes, eventsRes, linksRes, evalsRes, statusRes, plansRes, teamsRes, fieldSpacesRes] = await Promise.all([
     prospectsQuery,
     supabase.from("recruitment_events").select("*").eq("tenant_id", tenantId).order("starts_at", { ascending: false }),
     supabase.from("recruitment_registration_links").select("*").eq("tenant_id", tenantId).order("created_at", { ascending: false }),
@@ -122,6 +122,7 @@ export async function GET(request: NextRequest) {
     supabase.from("recruitment_status_history").select("*").eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(300),
     supabase.from("recruitment_plans").select("*").eq("tenant_id", tenantId).order("updated_at", { ascending: false }),
     supabase.from("teams").select("id, name, age_division").eq("tenant_id", tenantId).order("name"),
+    supabase.from("training_field_spaces").select("id, map_id, name, field_type, availability_status").eq("tenant_id", tenantId).eq("availability_status", "available").order("name"),
   ]);
 
   return NextResponse.json({
@@ -132,6 +133,7 @@ export async function GET(request: NextRequest) {
     statusHistory: statusRes.data ?? [],
     plans: plansRes.data ?? [],
     teams: teamsRes.data ?? [],
+    fieldSpaces: fieldSpacesRes.data ?? [],
     statuses: DEFAULT_STATUSES,
   });
 }
@@ -198,6 +200,22 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    // Auto-assign the field space to the team on this event date if provided
+    if (body.fieldSpaceId && body.fieldSpaceMapId && body.teamId) {
+      await supabase.from("training_field_space_assignments").insert({
+        tenant_id: tenantId,
+        map_id: body.fieldSpaceMapId,
+        field_space_id: body.fieldSpaceId,
+        team_id: body.teamId,
+        title: name,
+        start_at: startsAtDate.toISOString(),
+        end_at: endsAtDate.toISOString(),
+        status: "scheduled",
+        created_by: membershipId,
+      });
+    }
+
     return NextResponse.json({ event: data });
   }
 
