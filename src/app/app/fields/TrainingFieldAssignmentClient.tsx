@@ -59,6 +59,12 @@ type Assignment = {
   title: string;
   start_at: string;
   end_at: string;
+  slot_id?: string | null;
+  slot_name?: string | null;
+  slot_start_time?: string | null;
+  slot_end_time?: string | null;
+  effective_start_date?: string | null;
+  effective_end_date?: string | null;
   status: "scheduled" | "cancelled" | "completed";
 };
 
@@ -68,14 +74,28 @@ type Mode = "setup" | "assignments";
 
 type Toast = { id: number; kind: "success" | "error" | "info"; message: string };
 
-function toLocalInputValue(iso: string) {
-  const dt = new Date(iso);
-  const local = new Date(dt.getTime() - dt.getTimezoneOffset() * 60000);
-  return local.toISOString().slice(0, 16);
+function overlapsTimeRange(aStart: string, aEnd: string, bStart: string, bEnd: string) {
+  return aStart < bEnd && aEnd > bStart;
 }
 
-function toDateTimeIso(date: string, time: string) {
-  return new Date(`${date}T${time}:00`).toISOString();
+function overlapsDateRange(aStart: string, aEnd: string, bStart: string, bEnd: string) {
+  return aStart <= bEnd && aEnd >= bStart;
+}
+
+function assignmentStartDate(a: Assignment) {
+  return a.effective_start_date ?? a.start_at.slice(0, 10);
+}
+
+function assignmentEndDate(a: Assignment) {
+  return a.effective_end_date ?? a.end_at.slice(0, 10);
+}
+
+function assignmentStartTime(a: Assignment) {
+  return a.slot_start_time ?? a.start_at.slice(11, 16);
+}
+
+function assignmentEndTime(a: Assignment) {
+  return a.slot_end_time ?? a.end_at.slice(11, 16);
 }
 
 function toLocalDateInputValue(date: Date) {
@@ -143,8 +163,10 @@ export function TrainingFieldAssignmentClient() {
   const [assignmentSpaceId, setAssignmentSpaceId] = useState("");
   const [assignmentTeamId, setAssignmentTeamId] = useState("");
   const [assignmentTitle, setAssignmentTitle] = useState("");
-  const [assignmentDate, setAssignmentDate] = useState("");
+  const [assignmentEffectiveStartDate, setAssignmentEffectiveStartDate] = useState(() => toLocalDateInputValue(new Date()));
+  const [assignmentEffectiveEndDate, setAssignmentEffectiveEndDate] = useState(() => toLocalDateInputValue(new Date()));
   const [assignmentSlotId, setAssignmentSlotId] = useState("");
+  const [coverageDate, setCoverageDate] = useState(() => toLocalDateInputValue(new Date()));
 
   const [slotName, setSlotName] = useState("");
   const [slotStartTime, setSlotStartTime] = useState("");
@@ -228,23 +250,26 @@ export function TrainingFieldAssignmentClient() {
   }, []);
 
   const conflictingSlotIds = useMemo(() => {
-    if (!assignmentDate || !assignmentSpaceId) return new Set<string>();
+    if (!assignmentEffectiveStartDate || !assignmentEffectiveEndDate || !assignmentSpaceId) return new Set<string>();
     return new Set(
       assignmentSlots
         .filter((slot) => {
-          const slotStart = toDateTimeIso(assignmentDate, slot.startTime);
-          const slotEnd = toDateTimeIso(assignmentDate, slot.endTime);
           return mapAssignments.some(
             (a) =>
               a.field_space_id === assignmentSpaceId &&
               a.status !== "cancelled" &&
-              new Date(slotStart) < new Date(a.end_at) &&
-              new Date(slotEnd) > new Date(a.start_at)
+              overlapsDateRange(
+                assignmentEffectiveStartDate,
+                assignmentEffectiveEndDate,
+                assignmentStartDate(a),
+                assignmentEndDate(a)
+              ) &&
+              overlapsTimeRange(slot.startTime, slot.endTime, assignmentStartTime(a), assignmentEndTime(a))
           );
         })
         .map((slot) => slot.id)
     );
-  }, [assignmentDate, assignmentSpaceId, assignmentSlots, mapAssignments]);
+  }, [assignmentEffectiveStartDate, assignmentEffectiveEndDate, assignmentSpaceId, assignmentSlots, mapAssignments]);
 
   const selectedSlotHasConflict = assignmentSlotId ? conflictingSlotIds.has(assignmentSlotId) : false;
 
@@ -438,7 +463,12 @@ export function TrainingFieldAssignmentClient() {
     const assignmentSpace = filteredSpaces.find((s) => s.id === assignmentSpaceId);
     const selectedSlot = (assignmentSpace?.available_time_slots ?? []).find((slot) => slot.id === assignmentSlotId);
 
-    if (!selectedMapId || !assignmentSpaceId || !assignmentTitle.trim() || !assignmentDate || !selectedSlot) {
+    if (!selectedMapId || !assignmentSpaceId || !assignmentTitle.trim() || !assignmentEffectiveStartDate || !assignmentEffectiveEndDate || !selectedSlot) {
+      return;
+    }
+
+    if (assignmentEffectiveStartDate > assignmentEffectiveEndDate) {
+      pushToast("error", "Effective start date must be on or before end date.");
       return;
     }
 
@@ -446,9 +476,6 @@ export function TrainingFieldAssignmentClient() {
       pushToast("error", "Selected slot is already occupied for this date.");
       return;
     }
-
-    const startAt = toDateTimeIso(assignmentDate, selectedSlot.startTime);
-    const endAt = toDateTimeIso(assignmentDate, selectedSlot.endTime);
 
     const res = await fetch("/api/app/training-fields/assignments", {
       method: "POST",
@@ -459,8 +486,8 @@ export function TrainingFieldAssignmentClient() {
         slotId: selectedSlot.id,
         teamId: assignmentTeamId || null,
         title: assignmentTitle.trim(),
-        startAt,
-        endAt,
+        effectiveStartDate: assignmentEffectiveStartDate,
+        effectiveEndDate: assignmentEffectiveEndDate,
       }),
     });
     const json = await res.json();
@@ -483,16 +510,70 @@ export function TrainingFieldAssignmentClient() {
   const occupiedSpaceIds = useMemo(() => {
     const assignmentSpace = filteredSpaces.find((s) => s.id === assignmentSpaceId);
     const selectedSlot = (assignmentSpace?.available_time_slots ?? []).find((slot) => slot.id === assignmentSlotId);
-    if (!assignmentDate || !selectedSlot) return new Set<string>();
+    if (!assignmentEffectiveStartDate || !assignmentEffectiveEndDate || !selectedSlot) return new Set<string>();
 
-    const start = toDateTimeIso(assignmentDate, selectedSlot.startTime);
-    const end = toDateTimeIso(assignmentDate, selectedSlot.endTime);
     return new Set(
       mapAssignments
-        .filter((a) => new Date(start) < new Date(a.end_at) && new Date(end) > new Date(a.start_at) && a.status !== "cancelled")
+        .filter(
+          (a) =>
+            a.status !== "cancelled" &&
+            overlapsDateRange(assignmentEffectiveStartDate, assignmentEffectiveEndDate, assignmentStartDate(a), assignmentEndDate(a)) &&
+            overlapsTimeRange(selectedSlot.startTime, selectedSlot.endTime, assignmentStartTime(a), assignmentEndTime(a))
+        )
         .map((a) => a.field_space_id)
     );
-  }, [assignmentDate, assignmentSlotId, assignmentSpaceId, filteredSpaces, mapAssignments]);
+  }, [assignmentEffectiveStartDate, assignmentEffectiveEndDate, assignmentSlotId, assignmentSpaceId, filteredSpaces, mapAssignments]);
+
+  const coverageAssignments = useMemo(
+    () =>
+      mapAssignments.filter(
+        (a) =>
+          a.status !== "cancelled" &&
+          coverageDate >= assignmentStartDate(a) &&
+          coverageDate <= assignmentEndDate(a)
+      ),
+    [coverageDate, mapAssignments]
+  );
+
+  const teamNameById = useMemo(() => new Map(teams.map((t) => [t.id, t.name])), [teams]);
+
+  const coverageRange = useMemo(() => {
+    const toMinutes = (time: string) => {
+      const [h, m] = time.split(":").map((v) => Number(v));
+      return h * 60 + m;
+    };
+
+    const allTimes: number[] = [];
+    filteredSpaces.forEach((space) => {
+      (space.available_time_slots ?? []).forEach((slot) => {
+        allTimes.push(toMinutes(slot.startTime), toMinutes(slot.endTime));
+      });
+    });
+    coverageAssignments.forEach((a) => {
+      allTimes.push(toMinutes(assignmentStartTime(a)), toMinutes(assignmentEndTime(a)));
+    });
+
+    const defaultStart = 8 * 60;
+    const defaultEnd = 20 * 60;
+
+    if (allTimes.length === 0) {
+      return { start: defaultStart, end: defaultEnd, total: defaultEnd - defaultStart };
+    }
+
+    const min = Math.max(0, Math.min(...allTimes) - 30);
+    const max = Math.min(24 * 60, Math.max(...allTimes) + 30);
+    return { start: min, end: max, total: Math.max(60, max - min) };
+  }, [filteredSpaces, coverageAssignments]);
+
+  const coverageHourMarkers = useMemo(() => {
+    const markers: number[] = [];
+    const startHour = Math.floor(coverageRange.start / 60);
+    const endHour = Math.ceil(coverageRange.end / 60);
+    for (let h = startHour; h <= endHour; h += 1) {
+      markers.push(h * 60);
+    }
+    return markers;
+  }, [coverageRange]);
 
   return (
     <div className="max-w-350 mx-auto space-y-4">
@@ -831,29 +912,42 @@ export function TrainingFieldAssignmentClient() {
                         <Label>Title</Label>
                         <Input value={assignmentTitle} onChange={(e) => setAssignmentTitle(e.target.value)} placeholder="U12 Training" />
                       </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="space-y-1">
-                          <Label>Date</Label>
-                          <div className="space-y-2">
+                      <div className="space-y-2">
+                        <Label>Effective Date Range</Label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-1">
+                            <Label className="text-xs text-gray-500">Start Date</Label>
                             <div className="relative">
                               <CalendarDays className="h-4 w-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                              <Input type="date" value={assignmentDate} onChange={(e) => setAssignmentDate(e.target.value)} className="pl-9 h-10" />
+                              <Input type="date" value={assignmentEffectiveStartDate} onChange={(e) => setAssignmentEffectiveStartDate(e.target.value)} className="pl-9 h-10" />
                             </div>
-                            <div className="flex gap-2">
-                              {quickDateOptions.map((opt) => (
-                                <button
-                                  key={opt.value}
-                                  type="button"
-                                  className={`text-xs rounded-full px-3 py-1 border transition ${assignmentDate === opt.value ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-600 border-gray-200 hover:border-blue-300 hover:text-blue-700"}`}
-                                  onClick={() => setAssignmentDate(opt.value)}
-                                >
-                                  {opt.label}
-                                </button>
-                              ))}
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs text-gray-500">End Date</Label>
+                            <div className="relative">
+                              <CalendarDays className="h-4 w-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                              <Input type="date" value={assignmentEffectiveEndDate} onChange={(e) => setAssignmentEffectiveEndDate(e.target.value)} className="pl-9 h-10" />
                             </div>
                           </div>
                         </div>
-                        <div className="space-y-1">
+                        <div className="flex gap-2">
+                          {quickDateOptions.map((opt) => (
+                            <button
+                              key={opt.value}
+                              type="button"
+                              className="text-xs rounded-full px-3 py-1 border transition bg-white text-gray-600 border-gray-200 hover:border-blue-300 hover:text-blue-700"
+                              onClick={() => {
+                                setAssignmentEffectiveStartDate(opt.value);
+                                setAssignmentEffectiveEndDate(opt.value);
+                              }}
+                            >
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
                           <Label>Time Slot</Label>
                           <div className="rounded-md border border-gray-200 p-2 bg-gray-50/60 min-h-10">
                             {assignmentSlots.length > 0 ? (
@@ -895,19 +989,23 @@ export function TrainingFieldAssignmentClient() {
                               <p className="text-xs text-gray-500">Select a field with available slots.</p>
                             )}
                           </div>
-                        </div>
                       </div>
                       {assignmentSpaceId && assignmentSlots.length === 0 && (
                         <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
                           This field space has no time slots. Define slots in Setup Mode first.
                         </p>
                       )}
-                      {selectedSlotHasConflict && (
+                      {assignmentEffectiveStartDate > assignmentEffectiveEndDate && (
                         <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded px-2 py-1">
-                          Selected slot is conflicting on this date. Pick an available slot.
+                          Effective start date must be on or before end date.
                         </p>
                       )}
-                      <Button onClick={handleCreateAssignment} disabled={!assignmentSpaceId || !assignmentTitle.trim() || !assignmentDate || !assignmentSlotId || selectedSlotHasConflict}>
+                      {selectedSlotHasConflict && (
+                        <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded px-2 py-1">
+                          Selected slot is conflicting within the effective date range. Pick an available slot.
+                        </p>
+                      )}
+                      <Button onClick={handleCreateAssignment} disabled={!assignmentSpaceId || !assignmentTitle.trim() || !assignmentEffectiveStartDate || !assignmentEffectiveEndDate || assignmentEffectiveStartDate > assignmentEffectiveEndDate || !assignmentSlotId || selectedSlotHasConflict}>
                         <Save className="h-4 w-4 mr-1" /> Save Assignment
                       </Button>
                     </>
@@ -928,7 +1026,9 @@ export function TrainingFieldAssignmentClient() {
                 <div key={a.id} className="rounded-md border border-gray-200 p-2 text-sm flex items-center justify-between gap-2">
                   <div>
                     <p className="font-medium text-gray-900">{a.title}</p>
-                    <p className="text-xs text-gray-500">{toLocalInputValue(a.start_at).replace("T", " ")} - {toLocalInputValue(a.end_at).replace("T", " ")}</p>
+                    <p className="text-xs text-gray-500">
+                      {assignmentStartDate(a)} to {assignmentEndDate(a)} | {assignmentStartTime(a)} - {assignmentEndTime(a)}
+                    </p>
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge variant="outline">{a.status}</Badge>
@@ -939,6 +1039,88 @@ export function TrainingFieldAssignmentClient() {
                 </div>
               ))}
               {mapAssignments.length === 0 && <p className="text-sm text-gray-500">No assignments yet for this map.</p>}
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-sm font-semibold text-gray-900">Field Coverage Timeline</h3>
+              <div className="w-56">
+                <Input type="date" value={coverageDate} onChange={(e) => setCoverageDate(e.target.value)} className="h-9" />
+              </div>
+            </div>
+            <p className="text-xs text-gray-500">Gantt-style view of available slots and active team assignments for the selected date.</p>
+
+            <div className="overflow-auto rounded-lg border border-gray-200">
+              <div className="min-w-230">
+                <div className="grid grid-cols-[180px_1fr] border-b border-gray-200 bg-gray-50">
+                  <div className="px-3 py-2 text-xs font-semibold text-gray-600">Field Space</div>
+                  <div className="relative h-10">
+                    {coverageHourMarkers.map((mark) => {
+                      const pct = ((mark - coverageRange.start) / coverageRange.total) * 100;
+                      return (
+                        <div key={mark} className="absolute top-0 bottom-0" style={{ left: `${pct}%` }}>
+                          <div className="h-full border-l border-gray-200" />
+                          <span className="absolute top-1 left-1 text-[10px] text-gray-500">{String(Math.floor(mark / 60)).padStart(2, "0")}:00</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {filteredSpaces.map((space) => {
+                  const spaceAssignments = coverageAssignments.filter((a) => a.field_space_id === space.id);
+                  const toMinutes = (time: string) => {
+                    const [h, m] = time.split(":").map((v) => Number(v));
+                    return h * 60 + m;
+                  };
+
+                  return (
+                    <div key={space.id} className="grid grid-cols-[180px_1fr] border-b border-gray-100 last:border-b-0">
+                      <div className="px-3 py-3 text-xs font-medium text-gray-700">{space.name}</div>
+                      <div className="relative h-14 bg-white">
+                        {coverageHourMarkers.map((mark) => {
+                          const pct = ((mark - coverageRange.start) / coverageRange.total) * 100;
+                          return <div key={`${space.id}-${mark}`} className="absolute top-0 bottom-0 border-l border-gray-100" style={{ left: `${pct}%` }} />;
+                        })}
+
+                        {(space.available_time_slots ?? []).map((slot) => {
+                          const start = toMinutes(slot.startTime);
+                          const end = toMinutes(slot.endTime);
+                          const left = ((start - coverageRange.start) / coverageRange.total) * 100;
+                          const width = ((end - start) / coverageRange.total) * 100;
+                          return (
+                            <div
+                              key={`${space.id}-slot-${slot.id}`}
+                              className="absolute top-8 h-4 rounded bg-emerald-100 border border-emerald-200"
+                              style={{ left: `${left}%`, width: `${Math.max(width, 2)}%` }}
+                              title={`${slot.name}: ${slot.startTime}-${slot.endTime}`}
+                            />
+                          );
+                        })}
+
+                        {spaceAssignments.map((a) => {
+                          const start = toMinutes(assignmentStartTime(a));
+                          const end = toMinutes(assignmentEndTime(a));
+                          const left = ((start - coverageRange.start) / coverageRange.total) * 100;
+                          const width = ((end - start) / coverageRange.total) * 100;
+                          const teamName = a.team_id ? teamNameById.get(a.team_id) ?? "Team" : "Unassigned";
+                          return (
+                            <div
+                              key={`${space.id}-asg-${a.id}`}
+                              className="absolute top-2 h-5 rounded bg-blue-600 text-white px-2 text-[10px] flex items-center overflow-hidden whitespace-nowrap"
+                              style={{ left: `${left}%`, width: `${Math.max(width, 3)}%` }}
+                              title={`${a.title} (${teamName}) ${assignmentStartTime(a)}-${assignmentEndTime(a)}`}
+                            >
+                              {teamName}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </>

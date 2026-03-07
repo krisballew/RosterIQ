@@ -10,6 +10,14 @@ type TimeSlot = {
   endTime: string;
 };
 
+function overlapsTime(aStart: string, aEnd: string, bStart: string, bEnd: string) {
+  return aStart < bEnd && aEnd > bStart;
+}
+
+function overlapsDateRange(aStart: string, aEnd: string, bStart: string, bEnd: string) {
+  return aStart <= bEnd && aEnd >= bStart;
+}
+
 function overlaps(aStart: string, aEnd: string, bStart: string, bEnd: string) {
   return new Date(aStart) < new Date(bEnd) && new Date(aEnd) > new Date(bStart);
 }
@@ -25,11 +33,15 @@ export async function POST(request: NextRequest) {
   const fieldSpaceId = String(body.fieldSpaceId ?? "").trim();
   const slotId = String(body.slotId ?? "").trim();
   const title = String(body.title ?? "").trim();
-  const startAt = String(body.startAt ?? "").trim();
-  const endAt = String(body.endAt ?? "").trim();
+  const effectiveStartDate = String(body.effectiveStartDate ?? "").trim();
+  const effectiveEndDate = String(body.effectiveEndDate ?? "").trim();
 
-  if (!mapId || !fieldSpaceId || !slotId || !title || !startAt || !endAt) {
-    return NextResponse.json({ error: "mapId, fieldSpaceId, slotId, title, startAt, endAt are required" }, { status: 400 });
+  if (!mapId || !fieldSpaceId || !slotId || !title || !effectiveStartDate || !effectiveEndDate) {
+    return NextResponse.json({ error: "mapId, fieldSpaceId, slotId, title, effectiveStartDate, effectiveEndDate are required" }, { status: 400 });
+  }
+
+  if (effectiveStartDate > effectiveEndDate) {
+    return NextResponse.json({ error: "effectiveStartDate must be on or before effectiveEndDate" }, { status: 400 });
   }
 
   const { data: fieldSpace, error: fieldSpaceError } = await supabase
@@ -52,16 +64,29 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Selected time slot is not available for this field space." }, { status: 400 });
   }
 
+  const startAt = new Date(`${effectiveStartDate}T${selectedSlot.startTime}:00`).toISOString();
+  const endAt = new Date(`${effectiveStartDate}T${selectedSlot.endTime}:00`).toISOString();
+
   const { data: existing } = await supabase
     .from("training_field_space_assignments")
-    .select("id, start_at, end_at, status")
+    .select("id, start_at, end_at, status, slot_start_time, slot_end_time, effective_start_date, effective_end_date")
     .eq("tenant_id", tenantId)
     .eq("field_space_id", fieldSpaceId)
     .neq("status", "cancelled");
 
-  const conflict = (existing ?? []).some((e) => overlaps(startAt, endAt, e.start_at, e.end_at));
+  const conflict = (existing ?? []).some((e) => {
+    const existingStartDate = e.effective_start_date ?? String(e.start_at).slice(0, 10);
+    const existingEndDate = e.effective_end_date ?? String(e.end_at).slice(0, 10);
+    const existingStartTime = e.slot_start_time ?? String(e.start_at).slice(11, 16);
+    const existingEndTime = e.slot_end_time ?? String(e.end_at).slice(11, 16);
+
+    return (
+      overlapsDateRange(effectiveStartDate, effectiveEndDate, existingStartDate, existingEndDate) &&
+      overlapsTime(selectedSlot.startTime, selectedSlot.endTime, existingStartTime, existingEndTime)
+    );
+  });
   if (conflict) {
-    return NextResponse.json({ error: "This field space is already assigned for an overlapping time." }, { status: 409 });
+    return NextResponse.json({ error: "This field space already has an overlapping effective-dated assignment for the selected slot window." }, { status: 409 });
   }
 
   const { data, error } = await supabase
@@ -75,6 +100,12 @@ export async function POST(request: NextRequest) {
       title,
       start_at: startAt,
       end_at: endAt,
+      slot_id: selectedSlot.id,
+      slot_name: selectedSlot.name,
+      slot_start_time: selectedSlot.startTime,
+      slot_end_time: selectedSlot.endTime,
+      effective_start_date: effectiveStartDate,
+      effective_end_date: effectiveEndDate,
       notes: body.notes ?? null,
       status: body.status ?? "scheduled",
       published_at: body.publishedAt ?? null,
@@ -101,6 +132,12 @@ export async function PATCH(request: NextRequest) {
   if ("title" in body) updates.title = String(body.title ?? "").trim();
   if ("startAt" in body) updates.start_at = body.startAt;
   if ("endAt" in body) updates.end_at = body.endAt;
+  if ("effectiveStartDate" in body) updates.effective_start_date = body.effectiveStartDate;
+  if ("effectiveEndDate" in body) updates.effective_end_date = body.effectiveEndDate;
+  if ("slotId" in body) updates.slot_id = body.slotId;
+  if ("slotName" in body) updates.slot_name = body.slotName;
+  if ("slotStartTime" in body) updates.slot_start_time = body.slotStartTime;
+  if ("slotEndTime" in body) updates.slot_end_time = body.slotEndTime;
   if ("notes" in body) updates.notes = body.notes ?? null;
   if ("status" in body) updates.status = body.status;
   if ("teamId" in body) updates.team_id = body.teamId ?? null;
