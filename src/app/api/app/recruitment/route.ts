@@ -18,6 +18,55 @@ const DEFAULT_STATUSES = [
   "Archived",
 ];
 
+/**
+ * Convert a naive local datetime string (e.g. "2026-03-07T10:00") to a UTC Date,
+ * treating it as wall-clock time in the given IANA timezone.
+ */
+function zonedToUTC(localDateTimeStr: string, timeZone: string): Date {
+  // Parse the naive string as if it were UTC to get a reference instant
+  const ref = new Date(localDateTimeStr + ":00.000Z");
+  // Get what the same instant looks like in the target timezone
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "numeric",
+    minute: "numeric",
+    second: "numeric",
+    hour12: false,
+  }).formatToParts(ref);
+  const get = (type: string) =>
+    Number(parts.find((p) => p.type === type)?.value ?? "0");
+  // Build the apparent UTC timestamp for that timezone's reading
+  const apparentUTC = Date.UTC(
+    get("year"),
+    get("month") - 1,
+    get("day"),
+    get("hour") % 24,
+    get("minute"),
+    get("second"),
+  );
+  // The offset is how far the zone was from UTC at the reference instant
+  const offsetMs = ref.getTime() - apparentUTC;
+  // Apply offset to the original naive-as-UTC value to get the true UTC instant
+  return new Date(ref.getTime() + offsetMs);
+}
+
+/**
+ * Format a UTC Date as "YYYY-MM-DD" in the given IANA timezone (for same-day checks).
+ */
+function formatDateInZone(date: Date, timeZone: string): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "00";
+  return `${get("year")}-${get("month")}-${get("day")}`;
+}
+
 function slugify(v: string) {
   return v
     .toLowerCase()
@@ -176,14 +225,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "durationMinutes must be between 1 and 1440" }, { status: 400 });
     }
 
-    const startsAtDate = new Date(startAtRaw);
+    const { data: tenantRow } = await supabase
+      .from("tenants")
+      .select("timezone")
+      .eq("id", tenantId)
+      .single();
+    const tenantTz = tenantRow?.timezone ?? "UTC";
+
+    const startsAtDate = zonedToUTC(startAtRaw, tenantTz);
     if (Number.isNaN(startsAtDate.getTime())) {
       return NextResponse.json({ error: "Invalid startAt value" }, { status: 400 });
     }
 
     const endsAtDate = new Date(startsAtDate.getTime() + durationMinutes * 60_000);
     const startDatePart = startAtRaw.slice(0, 10);
-    const endDatePartLocal = `${endsAtDate.getFullYear()}-${String(endsAtDate.getMonth() + 1).padStart(2, "0")}-${String(endsAtDate.getDate()).padStart(2, "0")}`;
+    const endDatePartLocal = formatDateInZone(endsAtDate, tenantTz);
     if (startDatePart !== endDatePartLocal) {
       return NextResponse.json({ error: "Events must start and end on the same local day" }, { status: 400 });
     }
@@ -575,7 +631,14 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "durationMinutes must be between 1 and 1440" }, { status: 400 });
     }
 
-    const startsAtDate = new Date(startAtRaw);
+    const { data: tenantRow } = await supabase
+      .from("tenants")
+      .select("timezone")
+      .eq("id", tenantId)
+      .single();
+    const tenantTz = tenantRow?.timezone ?? "UTC";
+
+    const startsAtDate = zonedToUTC(startAtRaw, tenantTz);
     if (Number.isNaN(startsAtDate.getTime())) {
       return NextResponse.json({ error: "Invalid startAt value" }, { status: 400 });
     }
