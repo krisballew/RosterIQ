@@ -1,5 +1,5 @@
-import { FieldsClient } from "./FieldsClient";
+import { TrainingFieldAssignmentClient } from "./TrainingFieldAssignmentClient";
 
 export default function FieldsPage() {
-  return <FieldsClient />;
+  return <TrainingFieldAssignmentClient />;
 }
