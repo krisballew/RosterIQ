@@ -22,12 +22,18 @@ const navItems = [
   { href: "/app/home", label: "Home", icon: LayoutDashboard },
   { href: "/app/roster", label: "Roster Management", icon: Users },
   { href: "/app/lineup", label: "Lineup Builder", icon: Layers },
-  { href: "/app/reviews", label: "Player Reviews", icon: ClipboardList },
-  { href: "/app/education", label: "Education", icon: BookOpen },
-  { href: "/app/my-training", label: "My Training", icon: BookOpen },
   { href: "/app/recruitment", label: "Recruitment", icon: Search },
   { href: "/app/fields", label: "Field Assignments", icon: MapPin },
 ];
+
+const playerNavItems = [
+  { href: "/app/home", label: "Home", icon: LayoutDashboard },
+  { href: "/app/my-reviews", label: "My Reviews", icon: ClipboardList },
+  { href: "/app/education", label: "Education", icon: BookOpen },
+  { href: "/app/my-training", label: "My Training", icon: BookOpen },
+];
+
+const coachAdminReviewItem = { href: "/app/reviews", label: "Player Reviews", icon: ClipboardList };
 
 interface SidebarProps {
   isPlatformAdmin: boolean;
@@ -43,11 +49,10 @@ export function Sidebar({ isPlatformAdmin, isClubAdmin = false, pendingRequestsC
   // Determine which nav items to show based on role
   const isPlayer = highestRole && ["select_player", "academy_player"].includes(highestRole);
   
-  const visibleNavItems = isPlayer
-    ? navItems.filter((item) => 
-        ["/app/home", "/app/reviews", "/app/education", "/app/my-training"].includes(item.href)
-      )
-    : navItems;
+  const visibleNavItems = isPlayer ? playerNavItems : [
+    ...navItems,
+    coachAdminReviewItem,
+  ];
 
   return (
     <aside className="flex h-full w-64 flex-col bg-white">
