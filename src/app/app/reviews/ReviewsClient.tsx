@@ -32,7 +32,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 type ReviewSeason = "fall" | "spring";
-type ReviewStatus = "draft" | "completed";
+type ReviewStatus = "draft" | "published" | "completed";
 type RatingValue = "red" | "yellow" | "green";
 
 type ReviewPeriod = {
@@ -58,6 +58,9 @@ type PlayerReviewRow = {
     key_strengths: string;
     growth_areas: string;
     coach_notes: string;
+    shared_at: string | null;
+    published_at: string | null;
+    accepted_by_user_id: string | null;
     updated_at: string;
     completed_at: string | null;
   } | null;
@@ -153,6 +156,9 @@ function statusBadge(status: ReviewStatus | null) {
   if (status === "completed") {
     return <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 hover:bg-emerald-100">Completed</Badge>;
   }
+  if (status === "published") {
+    return <Badge className="bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-100">Published</Badge>;
+  }
   if (status === "draft") {
     return <Badge className="bg-amber-100 text-amber-700 border-amber-200 hover:bg-amber-100">Draft</Badge>;
   }
@@ -231,30 +237,63 @@ export function ReviewsClient() {
     setReviewForm((prev) => ({ ...prev, ratings: { ...prev.ratings, [key]: value } }));
   };
 
-  const saveReview = async (status: ReviewStatus) => {
+  const persistDraftReview = async () => {
+    if (!selectedPeriodId || !reviewingPlayer) return undefined;
+
+    const res = await fetch("/api/app/reviews", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        review_period_id: selectedPeriodId,
+        player_id: reviewingPlayer.id,
+        ratings: reviewForm.ratings,
+        key_strengths: reviewForm.key_strengths,
+        growth_areas: reviewForm.growth_areas,
+        coach_notes: reviewForm.coach_notes,
+      }),
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error ?? "Failed to save review");
+    return json.review?.id as string | undefined;
+  };
+
+  const saveReview = async () => {
     if (!selectedPeriodId || !reviewingPlayer) return;
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch("/api/app/reviews", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          review_period_id: selectedPeriodId,
-          player_id: reviewingPlayer.id,
-          status,
-          ratings: reviewForm.ratings,
-          key_strengths: reviewForm.key_strengths,
-          growth_areas: reviewForm.growth_areas,
-          coach_notes: reviewForm.coach_notes,
-        }),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "Failed to save review");
+      await persistDraftReview();
       setReviewingPlayer(null);
       await load(selectedPeriodId);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to save review");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const publishReview = async () => {
+    if (!selectedPeriodId || !reviewingPlayer) return;
+
+    setSaving(true);
+    setError(null);
+    try {
+      let reviewId = reviewingPlayer.review?.id;
+      if (!reviewId) {
+        reviewId = await persistDraftReview();
+      }
+      if (!reviewId) {
+        throw new Error("Please save the review first before publishing.");
+      }
+
+      const res = await fetch(`/api/app/reviews/${reviewId}/publish`, { method: "POST" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Failed to publish review");
+
+      setReviewingPlayer(null);
+      await load(selectedPeriodId);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to publish review");
     } finally {
       setSaving(false);
     }
@@ -452,7 +491,7 @@ export function ReviewsClient() {
                     <td className="px-4 py-3 text-gray-600">{p.review?.updated_at ? formatIsoDate(p.review.updated_at) : "-"}</td>
                     <td className="px-4 py-3 text-right">
                       <Button size="sm" variant="outline" onClick={() => openReview(p)} disabled={!selectedPeriodId}>
-                        {p.review ? "Edit" : "Start"}
+                        {p.review?.status === "completed" ? "View" : p.review ? "Edit" : "Start"}
                       </Button>
                     </td>
                   </tr>
@@ -473,6 +512,18 @@ export function ReviewsClient() {
               Rate performance areas, then capture strengths and growth goals for the next season discussion.
             </DialogDescription>
           </DialogHeader>
+
+          {reviewingPlayer?.review?.status === "published" && (
+            <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-700">
+              Published to player on {reviewingPlayer.review.published_at ? formatIsoDate(reviewingPlayer.review.published_at) : "-"}. Waiting for player acceptance.
+            </div>
+          )}
+
+          {reviewingPlayer?.review?.status === "completed" && (
+            <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+              Accepted by player on {reviewingPlayer.review.completed_at ? formatIsoDate(reviewingPlayer.review.completed_at) : "-"}.
+            </div>
+          )}
 
           <div className="space-y-6">
             {REVIEW_SECTIONS.map((section) => (
@@ -556,13 +607,13 @@ export function ReviewsClient() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setReviewingPlayer(null)} disabled={saving}>Cancel</Button>
-            <Button variant="outline" onClick={() => void saveReview("draft")} disabled={saving}>
+            <Button variant="outline" onClick={() => void saveReview()} disabled={saving || reviewingPlayer?.review?.status === "completed"}>
               {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
               Save Draft
             </Button>
-            <Button onClick={() => void saveReview("completed")} disabled={saving}>
+            <Button onClick={() => void publishReview()} disabled={saving || reviewingPlayer?.review?.status === "completed"}>
               {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
-              Mark Complete
+              Publish to Player
             </Button>
           </DialogFooter>
         </DialogContent>

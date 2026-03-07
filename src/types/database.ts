@@ -111,7 +111,7 @@ export type AccessRequestStatus = "pending" | "approved" | "rejected";
 
 export type ReviewSeason = "fall" | "spring";
 
-export type PlayerReviewStatus = "draft" | "completed";
+export type PlayerReviewStatus = "draft" | "published" | "completed";
 
 export interface AccessRequest {
   id: string;
@@ -153,6 +153,8 @@ export interface PlayerReview {
   growth_areas: string;
   coach_notes: string;
   shared_at: string | null;
+  published_at: string | null;
+  accepted_by_user_id: string | null;
   completed_at: string | null;
   created_at: string;
   updated_at: string;

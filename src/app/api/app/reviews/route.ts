@@ -164,11 +164,14 @@ export async function GET(request: NextRequest) {
   let reviews: Array<{
     id: string;
     player_id: string;
-    status: "draft" | "completed";
+    status: "draft" | "published" | "completed";
     ratings: Record<string, "red" | "yellow" | "green">;
     key_strengths: string;
     growth_areas: string;
     coach_notes: string;
+    shared_at: string | null;
+    published_at: string | null;
+    accepted_by_user_id: string | null;
     updated_at: string;
     completed_at: string | null;
   }> = [];
@@ -176,7 +179,7 @@ export async function GET(request: NextRequest) {
   if (selectedPeriod && playerIds.length > 0) {
     const { data: reviewsData, error: reviewsError } = await supabase
       .from("player_reviews")
-      .select("id, player_id, status, ratings, key_strengths, growth_areas, coach_notes, updated_at, completed_at")
+      .select("id, player_id, status, ratings, key_strengths, growth_areas, coach_notes, shared_at, published_at, accepted_by_user_id, updated_at, completed_at")
       .eq("tenant_id", tenantId)
       .eq("review_period_id", selectedPeriod.id)
       .in("player_id", playerIds);
@@ -245,7 +248,7 @@ export async function PUT(request: NextRequest) {
 
   const reviewPeriodId = typeof body.review_period_id === "string" ? body.review_period_id : "";
   const playerId = typeof body.player_id === "string" ? body.player_id : "";
-  const status = body.status === "completed" ? "completed" : "draft";
+  const status = "draft";
 
   if (!reviewPeriodId || !playerId) {
     return NextResponse.json({ error: "review_period_id and player_id are required" }, { status: 400 });
@@ -286,6 +289,25 @@ export async function PUT(request: NextRequest) {
     .eq("name", player.team_assigned ?? "")
     .maybeSingle();
 
+  const { data: existingReview, error: existingReviewError } = await supabase
+    .from("player_reviews")
+    .select("id, status")
+    .eq("tenant_id", tenantId)
+    .eq("review_period_id", reviewPeriodId)
+    .eq("player_id", playerId)
+    .maybeSingle();
+
+  if (existingReviewError) {
+    return NextResponse.json({ error: existingReviewError.message }, { status: 500 });
+  }
+
+  if (existingReview?.status === "completed" && !isTenantAdmin) {
+    return NextResponse.json(
+      { error: "Completed reviews cannot be edited by coaches" },
+      { status: 400 }
+    );
+  }
+
   if (!isTenantAdmin) {
     const assignedCoachMembershipId = teamForPlayer?.coach_membership_id;
     if (!assignedCoachMembershipId || !coachMembershipIds.includes(assignedCoachMembershipId)) {
@@ -308,8 +330,6 @@ export async function PUT(request: NextRequest) {
     memberships.find((m) => m.tenant_id === tenantId && (m.is_active ?? true))?.id ??
     null;
 
-  const nowIso = new Date().toISOString();
-
   const { data: upserted, error: upsertError } = await supabase
     .from("player_reviews")
     .upsert(
@@ -324,11 +344,14 @@ export async function PUT(request: NextRequest) {
         key_strengths: keyStrengths,
         growth_areas: growthAreas,
         coach_notes: coachNotes,
-        completed_at: status === "completed" ? nowIso : null,
+        shared_at: null,
+        published_at: null,
+        accepted_by_user_id: null,
+        completed_at: null,
       },
       { onConflict: "review_period_id,player_id" }
     )
-    .select("id, player_id, status, ratings, key_strengths, growth_areas, coach_notes, updated_at, completed_at")
+    .select("id, player_id, status, ratings, key_strengths, growth_areas, coach_notes, shared_at, published_at, accepted_by_user_id, updated_at, completed_at")
     .single();
 
   if (upsertError) {
