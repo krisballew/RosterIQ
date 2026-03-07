@@ -271,7 +271,7 @@ function SignupForm({ onBack }: { onBack: () => void }) {
           </label>
           <input
             type="text"
-            placeholder="e.g. cfc"
+            placeholder=""
             value={code}
             onChange={(e) => setCode(e.target.value)}
             required
