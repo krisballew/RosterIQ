@@ -503,7 +503,7 @@ export function TrainingFieldAssignmentClient() {
 
                           <div className="space-y-1">
                             <Label>Rotation ({Math.round(selectedSpace.rotation)}°)</Label>
-                            <Input type="range" min={0} max={359} value={selectedSpace.rotation} onChange={(e) => { const val = Number(e.target.value); setSpaces((prev) => prev.map((s) => (s.id === selectedSpace.id ? { ...s, rotation: val } : s))); }} onMouseUp={() => void patchSpace(selectedSpace.id, { rotation: selectedSpace.rotation })} />
+                            <Input type="range" min={0} max={359} value={selectedSpace.rotation} onChange={(e) => { const val = Number(e.target.value); setSpaces((prev) => prev.map((s) => (s.id === selectedSpace.id ? { ...s, rotation: val } : s))); }} onMouseUp={(e) => { const val = Number((e.target as HTMLInputElement).value); void patchSpace(selectedSpace.id, { rotation: val }); }} />
                           </div>
 
                           <Button variant="destructive" size="sm" onClick={() => void handleDeleteSpace(selectedSpace.id)}>
