@@ -1,6 +1,15 @@
 -- Training Management System
 -- Provides a club-wide learning and development hub for players and coaches
 
+-- Add membership_id to players table to link players to user accounts
+-- This allows players to log in and access their training assignments
+alter table public.players 
+  add column if not exists membership_id uuid references public.memberships(id) on delete set null;
+
+create index if not exists idx_players_membership 
+  on public.players(membership_id) 
+  where membership_id is not null;
+
 -- Training Categories (hierarchical organization)
 create table if not exists public.training_categories (
   id uuid primary key default gen_random_uuid(),

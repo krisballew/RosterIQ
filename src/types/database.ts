@@ -15,6 +15,7 @@ export type PlayerStatus = "active" | "inactive" | "practice_only";
 export interface Player {
   id: string;
   tenant_id: string;
+  membership_id: string | null;
   first_name: string;
   last_name: string;
   team_assigned: string | null;
