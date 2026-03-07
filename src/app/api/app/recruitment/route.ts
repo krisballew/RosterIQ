@@ -124,22 +124,23 @@ function parseCsv(csv: string) {
   return rows;
 }
 
-const COACH_ROLES = ["select_coach", "academy_coach"] as const;
-type CoachRole = (typeof COACH_ROLES)[number];
+// Management roles have full tenant-wide visibility.
+// Any other role (coaches, or any unrecognized value) is scoped to their assigned teams.
+const MANAGEMENT_ROLES = ["platform_admin", "club_admin", "club_director", "director_of_coaching"] as const;
+type ManagementRole = (typeof MANAGEMENT_ROLES)[number];
 
 export async function GET(request: NextRequest) {
   const auth = await requireRecruitmentAccess(false);
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   const { supabase, tenantId, role, membershipId } = auth;
-  const isCoach = COACH_ROLES.includes(role as CoachRole);
+  const isManager = MANAGEMENT_ROLES.includes(role as ManagementRole);
 
-  // For coaches, scope all data to their assigned teams only.
-  // Two-step lookup to avoid unreliable PostgREST embedded-resource WHERE filters:
-  //   1. Get all active membership IDs for this user in this tenant.
-  //   2. Find teams where coach_membership_id is one of those IDs.
+  // Non-managers are scoped to teams they are assigned as coach.
+  // Using !isManager (deny-list) rather than isCoach (allow-list) means an
+  // unrecognized or unexpected role also gets restricted access by default.
   let coachTeamIds: string[] | null = null;
-  if (isCoach) {
+  if (!isManager) {
     const { data: userMemberships } = await supabase
       .from("memberships")
       .select("id")
@@ -219,7 +220,7 @@ export async function GET(request: NextRequest) {
     supabase.from("recruitment_registration_links").select("*").eq("tenant_id", tenantId).order("created_at", { ascending: false }),
     supabase.from("recruitment_evaluations").select("*").eq("tenant_id", tenantId).order("created_at", { ascending: false }),
     supabase.from("recruitment_status_history").select("*").eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(300),
-    isCoach ? Promise.resolve({ data: [] }) : supabase.from("recruitment_plans").select("*").eq("tenant_id", tenantId).order("updated_at", { ascending: false }),
+    !isManager ? Promise.resolve({ data: [] }) : supabase.from("recruitment_plans").select("*").eq("tenant_id", tenantId).order("updated_at", { ascending: false }),
     supabase.from("teams").select("id, name, age_division").eq("tenant_id", tenantId).order("name"),
     supabase.from("training_field_spaces").select("id, map_id, name, field_type, availability_status, training_field_maps(training_complexes(name))").eq("tenant_id", tenantId).eq("availability_status", "available").order("name"),
   ]);
