@@ -36,7 +36,7 @@ export default async function RosterPage() {
   if (membership?.tenant_id) {
     const admin = createAdminClient();
     
-    const [playersRes, teamsRes, membershipsRes] = await Promise.all([
+    const [playersRes, teamsRes, membershipsRes, profilesRes] = await Promise.all([
       supabase
         .from("players")
         .select("*")
@@ -50,10 +50,13 @@ export default async function RosterPage() {
         .order("name", { ascending: true }),
       admin
         .from("memberships")
-        .select("id, user_id, role, profiles(first_name, last_name)")
+        .select("id, user_id, role")
         .eq("tenant_id", membership.tenant_id)
         .eq("is_active", true)
         .order("created_at", { ascending: false }),
+      admin
+        .from("profiles")
+        .select("user_id, first_name, last_name"),
     ]);
     
     players = (playersRes.data as Player[]) ?? [];
@@ -62,18 +65,33 @@ export default async function RosterPage() {
     // Get emails from auth.users and combine with membership data
     const { data: { users } } = await admin.auth.admin.listUsers();
     const userEmailMap = new Map(users.map(u => [u.id, u.email ?? ""]));
+    const profilesMap = new Map(
+      (profilesRes.data ?? []).map((p: any) => [p.user_id, { first_name: p.first_name, last_name: p.last_name }])
+    );
     
-    playerMemberships = (membershipsRes.data ?? []).map((m: any) => ({
-      id: m.id,
-      user_email: userEmailMap.get(m.user_id) ?? "",
-      first_name: m.profiles?.first_name ?? null,
-      last_name: m.profiles?.last_name ?? null,
-      role: m.role,
-    })).sort((a, b) => {
+    // Debug logging
+    console.log("Memberships data:", membershipsRes.data);
+    console.log("Memberships error:", membershipsRes.error);
+    console.log("Profiles count:", profilesRes.data?.length ?? 0);
+    console.log("Users count:", users.length);
+    console.log("Tenant ID:", membership.tenant_id);
+    
+    playerMemberships = (membershipsRes.data ?? []).map((m: any) => {
+      const profile = profilesMap.get(m.user_id);
+      return {
+        id: m.id,
+        user_email: userEmailMap.get(m.user_id) ?? "",
+        first_name: profile?.first_name ?? null,
+        last_name: profile?.last_name ?? null,
+        role: m.role,
+      };
+    }).sort((a, b) => {
       const aName = `${a.last_name ?? ""} ${a.first_name ?? ""}`.trim();
       const bName = `${b.last_name ?? ""} ${b.first_name ?? ""}`.trim();
       return aName.localeCompare(bName);
     });
+    
+    console.log("Final playerMemberships:", playerMemberships);
   }
 
   return <RosterClient initialPlayers={players} initialTeams={teams} playerMemberships={playerMemberships} />;
