@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import { RosterClient } from "./RosterClient";
 import type { Player, Team } from "@/types/database";
@@ -33,6 +34,8 @@ export default async function RosterPage() {
   }> = [];
 
   if (membership?.tenant_id) {
+    const admin = createAdminClient();
+    
     const [playersRes, teamsRes, membershipsRes] = await Promise.all([
       supabase
         .from("players")
@@ -45,17 +48,32 @@ export default async function RosterPage() {
         .select("*")
         .eq("tenant_id", membership.tenant_id)
         .order("name", { ascending: true }),
-      supabase
+      admin
         .from("memberships")
-        .select("id, user_email, first_name, last_name, role")
+        .select("id, user_id, role, profiles(first_name, last_name)")
         .eq("tenant_id", membership.tenant_id)
         .eq("is_active", true)
-        .order("last_name", { ascending: true })
-        .order("first_name", { ascending: true }),
+        .order("created_at", { ascending: false }),
     ]);
+    
     players = (playersRes.data as Player[]) ?? [];
     teams = (teamsRes.data as Team[]) ?? [];
-    playerMemberships = membershipsRes.data ?? [];
+    
+    // Get emails from auth.users and combine with membership data
+    const { data: { users } } = await admin.auth.admin.listUsers();
+    const userEmailMap = new Map(users.map(u => [u.id, u.email ?? ""]));
+    
+    playerMemberships = (membershipsRes.data ?? []).map((m: any) => ({
+      id: m.id,
+      user_email: userEmailMap.get(m.user_id) ?? "",
+      first_name: m.profiles?.first_name ?? null,
+      last_name: m.profiles?.last_name ?? null,
+      role: m.role,
+    })).sort((a, b) => {
+      const aName = `${a.last_name ?? ""} ${a.first_name ?? ""}`.trim();
+      const bName = `${b.last_name ?? ""} ${b.first_name ?? ""}`.trim();
+      return aName.localeCompare(bName);
+    });
   }
 
   return <RosterClient initialPlayers={players} initialTeams={teams} playerMemberships={playerMemberships} />;
