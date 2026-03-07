@@ -491,23 +491,32 @@ export function TrainingFieldAssignmentClient() {
                           }
                         }}
                         style={{
-                          transform: `rotate(${space.rotation}deg)`,
-                          background: occupiedSpaceIds.has(space.id)
-                            ? "rgba(239, 68, 68, 0.18)"
-                            : space.fill_color,
-                          border: `2px ${space.border_style} ${occupiedSpaceIds.has(space.id) ? "#dc2626" : space.border_color}`,
-                          borderRadius: 6,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
                           cursor: "move",
-                          boxShadow: selectedSpaceId === space.id ? "0 0 0 2px rgba(37, 99, 235, 0.6)" : undefined,
                           zIndex: selectedSpaceId === space.id ? 20 : 10,
                         }}
                       >
-                        <span className="px-2 py-1 rounded bg-white/85 text-xs font-semibold text-gray-900 pointer-events-none">
-                          {space.name}
-                        </span>
+                        <div
+                          style={{
+                            position: "absolute",
+                            inset: 0,
+                            transform: `rotate(${space.rotation}deg)`,
+                            transformOrigin: "center",
+                            background: occupiedSpaceIds.has(space.id)
+                              ? "rgba(239, 68, 68, 0.18)"
+                              : space.fill_color,
+                            border: `2px ${space.border_style} ${occupiedSpaceIds.has(space.id) ? "#dc2626" : space.border_color}`,
+                            borderRadius: 6,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            boxShadow: selectedSpaceId === space.id ? "0 0 0 2px rgba(37, 99, 235, 0.6)" : undefined,
+                            pointerEvents: "none",
+                          }}
+                        >
+                          <span className="px-2 py-1 rounded bg-white/85 text-xs font-semibold text-gray-900 pointer-events-none">
+                            {space.name}
+                          </span>
+                        </div>
                         {(selectedSpaceId === space.id || rotatingSpaceId === space.id) && (
                           <div
                             className="rotate-handle"
@@ -528,20 +537,20 @@ export function TrainingFieldAssignmentClient() {
                             }}
                             title="Drag to rotate"
                           >
-                                                  <svg
-                                                    width="16"
-                                                    height="16"
-                                                    viewBox="0 0 16 16"
-                                                    fill="none"
-                                                    style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)" }}
-                                                  >
-                                                    <path
-                                                      d="M8 2 L8 6 M8 2 L6 4 M8 2 L10 4"
-                                                      stroke="white"
-                                                      strokeWidth="1.5"
-                                                      strokeLinecap="round"
-                                                    />
-                                                  </svg>
+                            <svg
+                              width="16"
+                              height="16"
+                              viewBox="0 0 16 16"
+                              fill="none"
+                              style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)" }}
+                            >
+                              <path
+                                d="M8 2 L8 6 M8 2 L6 4 M8 2 L10 4"
+                                stroke="white"
+                                strokeWidth="1.5"
+                                strokeLinecap="round"
+                              />
+                            </svg>
                           </div>
                         )}
                       </Rnd>
