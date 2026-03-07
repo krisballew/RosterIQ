@@ -25,7 +25,11 @@ export async function requireRecruitmentAccess(requireManage = false) {
     .not("tenant_id", "is", null);
 
   const list = memberships ?? [];
-  const anyMembership = list[0];
+  // Prefer a recruitment-role membership so role detection is stable
+  const recruitmentMembership = list.find((m) =>
+    RECRUITMENT_ROLES.includes(m.role as (typeof RECRUITMENT_ROLES)[number])
+  );
+  const anyMembership = recruitmentMembership ?? list[0];
   if (!anyMembership?.tenant_id) return { error: "Forbidden", status: 403 as const };
 
   if (requireManage) {

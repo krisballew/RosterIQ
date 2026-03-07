@@ -134,14 +134,16 @@ export async function GET(request: NextRequest) {
   const { supabase, tenantId, role, membershipId } = auth;
   const isCoach = COACH_ROLES.includes(role as CoachRole);
 
-  // For coaches, scope all data to their assigned teams only
+  // For coaches, scope all data to their assigned teams only.
+  // Look up teams via user.id → memberships join so the result is stable
+  // regardless of which membership ID was returned by auth.
   let coachTeamIds: string[] | null = null;
   if (isCoach) {
     const { data: coachTeams } = await supabase
       .from("teams")
-      .select("id")
+      .select("id, coach_membership_id, memberships!inner(user_id)")
       .eq("tenant_id", tenantId)
-      .eq("coach_membership_id", membershipId);
+      .eq("memberships.user_id", auth.user.id);
     coachTeamIds = (coachTeams ?? []).map((t: { id: string }) => t.id);
   }
 
