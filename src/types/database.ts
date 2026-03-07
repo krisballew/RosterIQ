@@ -160,6 +160,81 @@ export interface PlayerReview {
   updated_at: string;
 }
 
+// Training Management Types
+export type TrainingContentType = "video" | "document" | "lesson" | "article";
+export type TrainingAudience = "player" | "coach" | "both";
+export type AgeDivision = "U6" | "U7" | "U8" | "U9" | "U10" | "U11" | "U12" | "U13" | "U14" | "U15" | "U16" | "U17" | "U18" | "U19";
+export type GenderFilter = "boys" | "girls" | "both";
+export type SkillLevel = "beginner" | "intermediate" | "advanced" | "all";
+
+export interface TrainingCategory {
+  id: string;
+  tenant_id: string;
+  name: string;
+  description: string | null;
+  parent_category_id: string | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TrainingContent {
+  id: string;
+  tenant_id: string;
+  title: string;
+  description: string | null;
+  content_type: TrainingContentType;
+  audience: TrainingAudience;
+  min_age_division: AgeDivision | null;
+  max_age_division: AgeDivision | null;
+  gender_filter: GenderFilter | null;
+  skill_level: SkillLevel | null;
+  video_url: string | null;
+  document_url: string | null;
+  thumbnail_url: string | null;
+  duration_minutes: number | null;
+  content_body: string | null;
+  category_id: string | null;
+  tags: string[];
+  is_published: boolean;
+  is_featured: boolean;
+  view_count: number;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TrainingAssignment {
+  id: string;
+  tenant_id: string;
+  content_id: string;
+  assigned_by: string;
+  assigned_at: string;
+  player_id: string | null;
+  team_id: string | null;
+  assignment_note: string | null;
+  due_date: string | null;
+  is_required: boolean;
+  created_at: string;
+}
+
+export interface TrainingProgress {
+  id: string;
+  tenant_id: string;
+  content_id: string;
+  membership_id: string;
+  first_viewed_at: string | null;
+  last_viewed_at: string | null;
+  view_count: number;
+  completion_percentage: number;
+  is_completed: boolean;
+  completed_at: string | null;
+  rating: number | null;
+  feedback_text: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export type Database = {
   public: {
     Tables: {
@@ -262,6 +337,48 @@ export type Database = {
           updated_at?: string;
         };
         Update: Partial<Omit<Lineup, "id" | "tenant_id">>;
+        Relationships: [];
+      };
+      training_categories: {
+        Row: TrainingCategory;
+        Insert: Omit<TrainingCategory, "id" | "created_at" | "updated_at"> & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<TrainingCategory, "id" | "tenant_id">>;
+        Relationships: [];
+      };
+      training_content: {
+        Row: TrainingContent;
+        Insert: Omit<TrainingContent, "id" | "created_at" | "updated_at" | "view_count"> & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+          view_count?: number;
+        };
+        Update: Partial<Omit<TrainingContent, "id" | "tenant_id">>;
+        Relationships: [];
+      };
+      training_assignments: {
+        Row: TrainingAssignment;
+        Insert: Omit<TrainingAssignment, "id" | "created_at" | "assigned_at"> & {
+          id?: string;
+          created_at?: string;
+          assigned_at?: string;
+        };
+        Update: Partial<Omit<TrainingAssignment, "id" | "tenant_id" | "content_id">>;
+        Relationships: [];
+      };
+      training_progress: {
+        Row: TrainingProgress;
+        Insert: Omit<TrainingProgress, "id" | "created_at" | "updated_at" | "view_count"> & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+          view_count?: number;
+        };
+        Update: Partial<Omit<TrainingProgress, "id" | "tenant_id" | "content_id" | "membership_id">>;
         Relationships: [];
       };
     };
