@@ -35,7 +35,7 @@ export async function GET() {
   // Query memberships for this tenant (exclude platform_admin)
   let query = adminClient
     .from("memberships")
-    .select("id, user_id, role, is_active, created_at, profiles(first_name, last_name)")
+    .select("*")
     .neq("role", "platform_admin")
     .order("created_at", { ascending: false });
 
@@ -50,18 +50,25 @@ export async function GET() {
     return NextResponse.json({ users: [] });
   }
 
-  // Get emails from auth.users via admin
-  const { data: authData } = await adminClient.auth.admin.listUsers({ perPage: 1000 });
-  const emailMap = new Map((authData?.users ?? []).map(u => [u.id, u.email ?? ""]));
+  const userIds = memberships.map(m => m.user_id);
+
+  // Profiles and auth emails must be fetched separately (no direct FK to memberships)
+  const [profilesRes, authData] = await Promise.all([
+    adminClient.from("profiles").select("user_id, first_name, last_name").in("user_id", userIds),
+    adminClient.auth.admin.listUsers({ perPage: 1000 }),
+  ]);
+
+  const profileMap = new Map((profilesRes.data ?? []).map(p => [p.user_id, p]));
+  const emailMap = new Map((authData.data?.users ?? []).map((u: { id: string; email?: string }) => [u.id, u.email ?? ""]));
 
   const users = (memberships as any[]).map(m => ({
     id: m.id,
     user_id: m.user_id,
     role: m.role,
-    is_active: m.is_active,
+    is_active: m.is_active ?? true,
     created_at: m.created_at,
-    first_name: m.profiles?.first_name ?? null,
-    last_name: m.profiles?.last_name ?? null,
+    first_name: profileMap.get(m.user_id)?.first_name ?? null,
+    last_name: profileMap.get(m.user_id)?.last_name ?? null,
     email: emailMap.get(m.user_id) ?? "",
   }));
 
