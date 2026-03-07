@@ -13,7 +13,7 @@ const DialogClose = DialogPrimitive.Close;
 const DialogOverlay = React.forwardRef<
   React.ComponentRef<typeof DialogPrimitive.Overlay>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay>
->(({ className, forceMount = true, ...props }, ref) => (
+>(({ className, forceMount, ...props }, ref) => (
   <DialogPrimitive.Overlay
     ref={ref}
     forceMount={forceMount}
@@ -29,7 +29,7 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 const DialogContent = React.forwardRef<
   React.ComponentRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, forceMount = true, ...props }, ref) => (
+>(({ className, children, forceMount, ...props }, ref) => (
   <DialogPortal forceMount={forceMount}>
     <DialogOverlay forceMount={forceMount} />
     <DialogPrimitive.Content
