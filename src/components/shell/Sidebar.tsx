@@ -26,6 +26,7 @@ const navItems = [
   { href: "/app/lineup", label: "Lineup Builder", icon: Layers },
   { href: "/app/recruitment", label: "Recruitment", icon: Search },
   { href: "/app/fields", label: "Field Assignments", icon: MapPin },
+  { href: "/app/education", label: "Education", icon: BookOpen },
 ];
 
 const playerNavItems = [
