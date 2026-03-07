@@ -109,6 +109,10 @@ export interface AccessCode {
 
 export type AccessRequestStatus = "pending" | "approved" | "rejected";
 
+export type ReviewSeason = "fall" | "spring";
+
+export type PlayerReviewStatus = "draft" | "completed";
+
 export interface AccessRequest {
   id: string;
   tenant_id: string;
@@ -121,6 +125,37 @@ export interface AccessRequest {
   reviewed_at: string | null;
   notes: string | null;
   created_at: string;
+}
+
+export interface ReviewPeriod {
+  id: string;
+  tenant_id: string;
+  season: ReviewSeason;
+  season_year: number;
+  title: string;
+  due_date: string;
+  is_active: boolean;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PlayerReview {
+  id: string;
+  tenant_id: string;
+  player_id: string;
+  team_id: string | null;
+  review_period_id: string;
+  reviewer_membership_id: string | null;
+  status: PlayerReviewStatus;
+  ratings: Record<string, "red" | "yellow" | "green">;
+  key_strengths: string;
+  growth_areas: string;
+  coach_notes: string;
+  shared_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export type Database = {
@@ -175,6 +210,26 @@ export type Database = {
           created_at?: string;
         };
         Update: Partial<Omit<AccessRequest, "id">>;
+        Relationships: [];
+      };
+      review_periods: {
+        Row: ReviewPeriod;
+        Insert: Omit<ReviewPeriod, "id" | "created_at" | "updated_at"> & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<ReviewPeriod, "id" | "tenant_id">>;
+        Relationships: [];
+      };
+      player_reviews: {
+        Row: PlayerReview;
+        Insert: Omit<PlayerReview, "id" | "created_at" | "updated_at"> & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<PlayerReview, "id" | "tenant_id" | "player_id" | "review_period_id">>;
         Relationships: [];
       };
       players: {
