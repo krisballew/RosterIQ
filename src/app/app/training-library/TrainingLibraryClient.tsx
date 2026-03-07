@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { 
   BookOpen, Video, FileText, Newspaper, Users, User, 
@@ -459,34 +459,49 @@ export default function TrainingLibraryClient() {
               <Label className="text-sm font-medium text-gray-700 flex items-center gap-1.5">
                 <Users className="h-3.5 w-3.5" /> Audience
               </Label>
-              <Select value={filterAudience} onValueChange={setFilterAudience} className="mt-1.5">
-                <option value="all">All</option>
-                <option value="player">Players</option>
-                <option value="coach">Coaches</option>
-                <option value="both">Both</option>
+              <Select value={filterAudience} onValueChange={setFilterAudience}>
+                <SelectTrigger className="mt-1.5">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="player">Players</SelectItem>
+                  <SelectItem value="coach">Coaches</SelectItem>
+                  <SelectItem value="both">Both</SelectItem>
+                </SelectContent>
               </Select>
             </div>
             <div>
               <Label className="text-sm font-medium text-gray-700 flex items-center gap-1.5">
                 <FolderOpen className="h-3.5 w-3.5" /> Category
               </Label>
-              <Select value={filterCategory} onValueChange={setFilterCategory} className="mt-1.5">
-                <option value="all">All Categories</option>
-                {categories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </option>
-                ))}
+              <Select value={filterCategory} onValueChange={setFilterCategory}>
+                <SelectTrigger className="mt-1.5">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  {categories.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </div>
             <div>
               <Label className="text-sm font-medium text-gray-700 flex items-center gap-1.5">
                 <Tag className="h-3.5 w-3.5" /> Status
               </Label>
-              <Select value={filterPublished} onValueChange={setFilterPublished} className="mt-1.5">
-                <option value="all">All</option>
-                <option value="published">Published</option>
-                <option value="draft">Draft</option>
+              <Select value={filterPublished} onValueChange={setFilterPublished}>
+                <SelectTrigger className="mt-1.5">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="published">Published</SelectItem>
+                  <SelectItem value="draft">Draft</SelectItem>
+                </SelectContent>
               </Select>
             </div>
           </div>

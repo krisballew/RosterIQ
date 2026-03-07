@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { 
   BookOpen, Video, FileText, Newspaper, Users, User, 
@@ -519,13 +519,18 @@ export default function CoachTrainingClient() {
                 <Label className="font-semibold flex items-center gap-1.5">
                   <User className="h-4 w-4" /> Select Player *
                 </Label>
-                <Select value={selectedPlayerId} onValueChange={setSelectedPlayerId} className="mt-1.5">
-                  <option value="">Choose a player...</option>
-                  {players.map((player) => (
-                    <option key={player.id} value={player.id}>
-                      {player.first_name} {player.last_name}
-                    </option>
-                  ))}
+                <Select value={selectedPlayerId} onValueChange={setSelectedPlayerId}>
+                  <SelectTrigger className="mt-1.5">
+                    <SelectValue placeholder="Choose a player..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Choose a player...</SelectItem>
+                    {players.map((player) => (
+                      <SelectItem key={player.id} value={player.id}>
+                        {player.first_name} {player.last_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
                 </Select>
               </div>
             )}
@@ -535,13 +540,18 @@ export default function CoachTrainingClient() {
                 <Label className="font-semibold flex items-center gap-1.5">
                   <Users className="h-4 w-4" /> Select Team *
                 </Label>
-                <Select value={selectedTeamId} onValueChange={setSelectedTeamId} className="mt-1.5">
-                  <option value="">Choose a team...</option>
-                  {teams.map((team) => (
-                    <option key={team.id} value={team.id}>
-                      {team.name}
-                    </option>
-                  ))}
+                <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
+                  <SelectTrigger className="mt-1.5">
+                    <SelectValue placeholder="Choose a team..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Choose a team...</SelectItem>
+                    {teams.map((team) => (
+                      <SelectItem key={team.id} value={team.id}>
+                        {team.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
                 </Select>
               </div>
             )}
